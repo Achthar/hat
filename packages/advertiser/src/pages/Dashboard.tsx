@@ -110,7 +110,7 @@ export function Dashboard() {
           {
             chainId: `0x${ARC_TESTNET_CHAIN_ID.toString(16)}`,
             chainName: "Arc Testnet",
-            rpcUrls: ["https://testnet-rpc.arc.circle.com"],
+            rpcUrls: ["https://rpc.testnet.arc.network"],
             nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
           },
         ],

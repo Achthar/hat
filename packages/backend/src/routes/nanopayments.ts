@@ -19,7 +19,14 @@ nanopaymentRoutes.get("/status", async (c) => {
 
     const platformAddress = getPlatformAddress(c.env);
     const gatewayWallet = getGatewayWalletAddress(c.env);
-    const balance = await getGatewayBalance(c.env);
+
+    // Balance check hits the RPC — don't let it crash the whole endpoint
+    let balance = "0";
+    try {
+      balance = await getGatewayBalance(c.env);
+    } catch {
+      // RPC may be down — return what we can
+    }
 
     return c.json({
       enabled: !!gatewayWallet,

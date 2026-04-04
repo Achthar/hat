@@ -1,5 +1,5 @@
 export const ARC_TESTNET_CHAIN_ID = 5042002;
-export const ARC_TESTNET_RPC = "https://testnet-rpc.arc.circle.com";
+export const ARC_TESTNET_RPC = "https://rpc.testnet.arc.network";
 
 // Placeholder — fill after deployment
 export const CONTRACTS = {
