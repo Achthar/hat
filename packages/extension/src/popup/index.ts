@@ -1,18 +1,16 @@
 let API_BASE = "https://hat-backend.achim-d87.workers.dev/api";
 
-// Allow override via extension storage
 try {
   chrome.storage.local.get("apiBase", (data) => {
     if (data.apiBase) API_BASE = data.apiBase;
   });
-} catch {
-  // not in extension context
-}
+} catch {}
 
 // ── DOM refs ──────────────────────────────────────────────────
 
 const viewDisconnected = document.getElementById("view-disconnected")!;
 const viewConnected = document.getElementById("view-connected")!;
+const worldIdBtn = document.getElementById("worldid-btn")!;
 const connectBtn = document.getElementById("connect-btn")!;
 const disconnectBtn = document.getElementById("disconnect-btn")!;
 const walletAddr = document.getElementById("wallet-addr")!;
@@ -21,9 +19,19 @@ const usdcEarnedEl = document.getElementById("usdc-earned")!;
 const verifiedEl = document.getElementById("verified-status")!;
 const statusDot = document.getElementById("status-dot")!;
 const verifyBtn = document.getElementById("verify-btn")!;
+const linkWalletBtn = document.getElementById("link-wallet-btn")!;
 const statusEl = document.getElementById("status")!;
 
-// ── State ─────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────
+
+/** Is this a World ID nullifier (not a real wallet address)? */
+function isNullifierId(id: string): boolean {
+  // Nullifiers are long hex strings starting with 0x, typically 66+ chars
+  // Wallet addresses are exactly 42 chars (0x + 40 hex)
+  return id.length > 42 || !id.startsWith("0x");
+}
+
+// ── View switching ────────────────────────────────────────────
 
 function showDisconnected() {
   viewDisconnected.classList.remove("hidden");
@@ -39,8 +47,9 @@ function showConnected(data: {
   viewDisconnected.classList.add("hidden");
   viewConnected.classList.remove("hidden");
 
-  // Wallet address
-  walletAddr.textContent = `${data.userId.slice(0, 6)}...${data.userId.slice(-4)}`;
+  // Show address (truncated)
+  const id = data.userId;
+  walletAddr.textContent = `${id.slice(0, 6)}...${id.slice(-4)}`;
 
   // Earnings
   hatEarnedEl.textContent = String(Math.floor(data.hatEarned || 0));
@@ -51,22 +60,28 @@ function showConnected(data: {
     verifiedEl.textContent = "Verified Human";
     verifiedEl.style.color = "#22c55e";
     statusDot.classList.add("verified");
-    verifyBtn.textContent = "Verified";
-    verifyBtn.style.background = "linear-gradient(135deg, #22c55e, #16a34a)";
-    (verifyBtn as HTMLButtonElement).disabled = true;
+    verifyBtn.classList.add("hidden");
     statusEl.textContent = "Earning HAT for your attention";
   } else {
     verifiedEl.textContent = "Not Verified";
     verifiedEl.style.color = "#fb7185";
     statusDot.classList.remove("verified");
+    verifyBtn.classList.remove("hidden");
     verifyBtn.textContent = "Verify with World ID";
     verifyBtn.style.background = "";
     (verifyBtn as HTMLButtonElement).disabled = false;
     statusEl.textContent = "Verify to start earning rewards";
   }
+
+  // Show "Connect Wallet for Payouts" if logged in via nullifier (no real wallet)
+  if (isNullifierId(id)) {
+    linkWalletBtn.classList.remove("hidden");
+  } else {
+    linkWalletBtn.classList.add("hidden");
+  }
 }
 
-// ── Fetch live stats from backend ─────────────────────────────
+// ── Backend helpers ───────────────────────────────────────────
 
 async function fetchLiveStats(address: string) {
   try {
@@ -80,13 +95,11 @@ async function fetchLiveStats(address: string) {
       });
       return data;
     }
-  } catch {
-    // offline or backend down
-  }
+  } catch {}
   return null;
 }
 
-// ── Load state on open ────────────────────────────────────────
+// ── Load state ────────────────────────────────────────────────
 
 function loadState() {
   chrome.runtime.sendMessage({ type: "GET_STATUS" }, async (data) => {
@@ -97,7 +110,6 @@ function loadState() {
 
     showConnected(data);
 
-    // Refresh from backend for latest earnings
     const live = await fetchLiveStats(data.userId);
     if (live) {
       showConnected({
@@ -110,15 +122,142 @@ function loadState() {
   });
 }
 
+// ── Connect wallet via MetaMask on active tab ────────────────
+
+async function connectWallet() {
+  const btn = connectBtn as HTMLButtonElement;
+  btn.disabled = true;
+  btn.textContent = "Connecting...";
+  statusEl.textContent = "";
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) throw new Error("No active tab");
+
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const eth = (window as unknown as { ethereum?: { request: (a: { method: string }) => Promise<string[]> } }).ethereum;
+        if (!eth) return { error: "no-wallet" };
+        return eth.request({ method: "eth_requestAccounts" })
+          .then((accounts: string[]) => ({ address: accounts[0] }))
+          .catch((e: Error) => ({ error: e.message }));
+      },
+    });
+
+    const result = results?.[0]?.result as { address?: string; error?: string } | undefined;
+
+    if (!result || result.error) {
+      statusEl.textContent = result?.error === "no-wallet"
+        ? "No wallet found on this page. Try a different tab."
+        : (result?.error || "Connection failed");
+      btn.disabled = false;
+      btn.textContent = "Connect Wallet";
+      return;
+    }
+
+    const address = result.address!;
+
+    try {
+      await fetch(`${API_BASE}/auth/connect-wallet`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+    } catch {}
+
+    chrome.storage.local.set({ userId: address });
+
+    const live = await fetchLiveStats(address);
+    showConnected({
+      userId: address,
+      verified: live?.verified ?? false,
+      hatEarned: live?.totalHatEarned ?? 0,
+      usdcEarned: live?.totalUsdcEarned ?? 0,
+    });
+  } catch (e) {
+    statusEl.textContent = `Failed: ${e instanceof Error ? e.message : String(e)}`;
+    btn.disabled = false;
+    btn.textContent = "Connect Wallet";
+  }
+}
+
+// ── Link wallet to existing World ID account ─────────────────
+
+async function linkWallet() {
+  const btn = linkWalletBtn as HTMLButtonElement;
+  btn.disabled = true;
+  btn.textContent = "Connecting...";
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) throw new Error("No active tab");
+
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const eth = (window as unknown as { ethereum?: { request: (a: { method: string }) => Promise<string[]> } }).ethereum;
+        if (!eth) return { error: "no-wallet" };
+        return eth.request({ method: "eth_requestAccounts" })
+          .then((accounts: string[]) => ({ address: accounts[0] }))
+          .catch((e: Error) => ({ error: e.message }));
+      },
+    });
+
+    const result = results?.[0]?.result as { address?: string; error?: string } | undefined;
+
+    if (!result || result.error) {
+      statusEl.textContent = result?.error === "no-wallet"
+        ? "No wallet found. Open a page with MetaMask."
+        : (result?.error || "Connection failed");
+      btn.disabled = false;
+      btn.textContent = "Connect Wallet for Payouts";
+      return;
+    }
+
+    const address = result.address!;
+
+    // Get current nullifier and link wallet on backend
+    chrome.storage.local.get("nullifier", async (data) => {
+      try {
+        await fetch(`${API_BASE}/auth/link-wallet`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nullifier: data.nullifier, address }),
+        });
+      } catch {}
+
+      // Update stored userId to the real wallet address
+      chrome.storage.local.set({ userId: address });
+
+      const live = await fetchLiveStats(address);
+      showConnected({
+        userId: address,
+        verified: live?.verified ?? true,
+        hatEarned: live?.totalHatEarned ?? 0,
+        usdcEarned: live?.totalUsdcEarned ?? 0,
+      });
+    });
+  } catch (e) {
+    statusEl.textContent = `Failed: ${e instanceof Error ? e.message : String(e)}`;
+    btn.disabled = false;
+    btn.textContent = "Connect Wallet for Payouts";
+  }
+}
+
 // ── Actions ───────────────────────────────────────────────────
 
-connectBtn.addEventListener("click", () => {
-  chrome.tabs.create({ url: "http://localhost:3000" });
+worldIdBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: "http://localhost:3000/verify" });
 });
+
+connectBtn.addEventListener("click", connectWallet);
 
 verifyBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: "http://localhost:3000/verify" });
 });
+
+linkWalletBtn.addEventListener("click", linkWallet);
 
 disconnectBtn.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "DISCONNECT" }, () => {
@@ -126,10 +265,9 @@ disconnectBtn.addEventListener("click", () => {
   });
 });
 
-// ── Init & auto-refresh ──────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", () => {
   loadState();
-  // Refresh every 10s while popup is open
   setInterval(loadState, 10_000);
 });

@@ -701,6 +701,17 @@ function checkAuthAndActivate() {
   });
 }
 
+// Listen for World ID verification messages from the web app
+window.addEventListener("message", (event) => {
+  if (event.data?.type === "HAT_WORLD_ID_VERIFIED" && event.data.address) {
+    chrome.storage.local.set({
+      userId: event.data.address,
+      verified: true,
+      nullifier: event.data.nullifier,
+    });
+  }
+});
+
 // Check on page load
 checkAuthAndActivate();
 

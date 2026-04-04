@@ -4,6 +4,7 @@ import {
   getGatewayBalance,
   getPlatformAddress,
   getGatewayWalletAddress,
+  getGatewayContract,
   depositToGateway,
 } from "../services/gateway.js";
 import * as db from "../db.js";
@@ -32,6 +33,7 @@ nanopaymentRoutes.get("/status", async (c) => {
       enabled: !!gatewayWallet,
       platformAddress,
       gatewayWallet,
+      gatewayContract: getGatewayContract(),
       balance,
       network: "arc-testnet",
     });

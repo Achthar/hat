@@ -27,21 +27,36 @@ export function Verify() {
   const { user, connect, refreshUser } = useWallet();
   const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
   const [error, setError] = useState("");
+  const [verifiedAddress, setVerifiedAddress] = useState<string | null>(null);
 
+  // Called by IDKit after proof is generated — address is optional
   async function handleVerify(proof: ISuccessResult) {
-    if (!user.address) return;
     setStatus("verifying");
 
     const res = await fetch(`${API_BASE}/auth/verify-world-id`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ proof, address: user.address }),
+      body: JSON.stringify({ proof, address: user.address || undefined }),
     });
 
     if (!res.ok) {
       const data = await res.json();
       throw new Error(data.error || "Verification failed");
     }
+
+    const data = await res.json();
+
+    // Notify the extension if present
+    try {
+      window.postMessage({
+        type: "HAT_WORLD_ID_VERIFIED",
+        address: data.address,
+        nullifier: data.nullifier,
+        verified: true,
+      }, "*");
+    } catch { /* not in extension context */ }
+
+    setVerifiedAddress(data.address);
   }
 
   function handleSuccess() {
@@ -94,45 +109,40 @@ export function Verify() {
         </div>
 
         <h1 style={{ fontSize: 26, fontWeight: 800, color: c.text, margin: "0 0 8px" }}>
-          Verify Your Humanity
+          Login with World ID
         </h1>
         <p style={{ color: c.muted, fontSize: 15, lineHeight: 1.6, margin: "0 0 32px" }}>
-          Prove you're human with World ID to start earning{" "}
+          Prove you're human to start earning{" "}
           <span style={{ color: c.indigo, fontWeight: 600 }}>USDC</span> nanopayments
           {" "}plus bonus{" "}
           <span style={{ color: c.amber, fontWeight: 600 }}>HAT</span> tokens.
         </p>
 
-        {!user.address ? (
+        {status === "idle" ? (
           <>
-            <p style={{ fontSize: 14, color: c.muted, marginBottom: 16 }}>Connect your wallet first.</p>
-            <button onClick={connect} style={btnPrimary}>
-              Connect Wallet
-            </button>
-          </>
-        ) : status === "idle" ? (
-          <>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                background: c.indigoBg,
-                borderRadius: 100,
-                padding: "8px 16px",
-                fontSize: 13,
-                color: c.indigo,
-                marginBottom: 24,
-              }}
-            >
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.indigo }} />
-              {user.address.slice(0, 6)}...{user.address.slice(-4)}
-            </div>
+            {user.address && (
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: c.indigoBg,
+                  borderRadius: 100,
+                  padding: "8px 16px",
+                  fontSize: 13,
+                  color: c.indigo,
+                  marginBottom: 16,
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.indigo }} />
+                {user.address.slice(0, 6)}...{user.address.slice(-4)}
+              </div>
+            )}
 
             <IDKitWidget
               app_id={APP_ID}
               action={WORLD_ID_ACTION}
-              signal={user.address}
+              signal={user.address || "hat-user"}
               verification_level={VerificationLevel.Orb}
               handleVerify={handleVerify}
               onSuccess={handleSuccess}
@@ -144,6 +154,21 @@ export function Verify() {
                 </button>
               )}
             </IDKitWidget>
+
+            {!user.address && (
+              <button
+                onClick={connect}
+                style={{
+                  ...btnSecondary,
+                  width: "100%",
+                  marginTop: 12,
+                  padding: 14,
+                  fontSize: 14,
+                }}
+              >
+                Or connect wallet first
+              </button>
+            )}
 
             <p style={{ fontSize: 12, color: c.muted, marginTop: 16, opacity: 0.7 }}>
               World ID 4.0 — Orb verification
@@ -177,7 +202,6 @@ export function Verify() {
                 alignItems: "center",
                 justifyContent: "center",
                 margin: "0 auto 16px",
-                fontSize: 28,
               }}
             >
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -188,6 +212,23 @@ export function Verify() {
             <p style={{ color: c.muted, fontSize: 14, lineHeight: 1.6 }}>
               You are now a verified human. Start browsing to earn rewards.
             </p>
+            {verifiedAddress && (
+              <div
+                style={{
+                  marginTop: 16,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: c.indigoBg,
+                  borderRadius: 100,
+                  padding: "8px 16px",
+                  fontSize: 12,
+                  color: c.indigo,
+                }}
+              >
+                ID: {verifiedAddress.slice(0, 10)}...{verifiedAddress.slice(-6)}
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ padding: "16px 0" }}>
@@ -232,4 +273,16 @@ const btnPrimary: React.CSSProperties = {
   fontWeight: 600,
   cursor: "pointer",
   transition: "opacity .15s",
+};
+
+const btnSecondary: React.CSSProperties = {
+  padding: "12px 32px",
+  background: "transparent",
+  color: "#6366f1",
+  border: "1px solid #e0e7ff",
+  borderRadius: 12,
+  fontSize: 15,
+  fontWeight: 600,
+  cursor: "pointer",
+  transition: "background .15s",
 };

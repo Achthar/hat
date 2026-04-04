@@ -21,4 +21,22 @@ app.route("/api/nanopayments", nanopaymentRoutes);
 
 app.get("/api/health", (c) => c.json({ status: "ok" }));
 
-export default app;
+// ── Cron: auto-settle every 15 minutes ─────────────────────────
+import { runSettlement } from "./services/settlement.js";
+
+export default {
+  fetch: app.fetch,
+  async scheduled(event: ScheduledEvent, env: Env) {
+    console.log(`[cron] Settlement triggered at ${new Date(event.scheduledTime).toISOString()}`);
+    try {
+      const result = await runSettlement(env.DB, env, false); // includeUnverified for demo
+      if (result.recipientCount > 0) {
+        console.log(`[cron] Settled: ${result.recipientCount} recipients, $${result.totalUsdc.toFixed(4)} USDC, ${Math.floor(result.totalHat)} HAT`);
+      } else {
+        console.log("[cron] Nothing to settle");
+      }
+    } catch (e) {
+      console.error("[cron] Settlement failed:", e);
+    }
+  },
+};

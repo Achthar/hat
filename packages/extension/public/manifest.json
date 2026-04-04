@@ -3,7 +3,7 @@
   "name": "HAT - Human Attention Token",
   "version": "0.0.1",
   "description": "Earn rewards for verified human attention to ads",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js",

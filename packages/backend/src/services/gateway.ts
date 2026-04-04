@@ -2,10 +2,16 @@
  * Circle Gateway nanopayment service for Arc Testnet.
  *
  * Two modes:
- *   A) Gateway Wallet (preferred) — offchain EIP-3009 signatures,
- *      Circle batches settlement, zero gas per payment.
+ *   A) Gateway Wallet (preferred) — offchain EIP-3009 signatures against
+ *      the shared GatewayWalletBatched contract. Circle batches settlement.
  *   B) Direct transfer (fallback) — on-chain native USDC send from
- *      platform EOA. Used when Gateway Wallet isn't provisioned yet.
+ *      platform EOA. Used when Gateway Wallet isn't provisioned.
+ *
+ * The GatewayWalletBatched is a shared contract (same address on every chain):
+ *   0x0077777d7EBA4688BDeF3E311b846F25870A19B9
+ *
+ * It tracks per-depositor balances internally. The `from` in EIP-3009
+ * is the depositor EOA (our platform wallet), not the contract.
  *
  * On Arc, USDC is the native gas token (18 decimals).
  */
@@ -20,22 +26,25 @@ import {
 import type { NanopaymentResult } from "@hat/common";
 import type { Env } from "../types.js";
 
-// ── Gateway Wallet ABI (minimal interface for deposit) ─────────
+// GatewayWalletBatched contract — same deterministic address on all chains
+const GATEWAY_WALLET_CONTRACT = "0x0077777d7EBA4688BDeF3E311b846F25870A19B9";
+
+// Minimal ABI for deposit (payable function that credits msg.sender's balance)
 const GATEWAY_WALLET_ABI = [
   "function deposit() external payable",
-  "function getBalance(address owner) external view returns (uint256)",
-  "function owner() external view returns (address)",
 ];
 
+// USDC token address on Arc Testnet (native gas token wrapper for EIP-3009)
+const USDC_ADDRESS = "0x3600000000000000000000000000000000000000";
+
 // ── EIP-712 domain for GatewayWalletBatched ────────────────────
-function getEIP712Domain(gatewayWalletAddress: string) {
-  return {
-    name: "GatewayWalletBatched",
-    version: "1",
-    chainId: 5042002,
-    verifyingContract: gatewayWalletAddress,
-  };
-}
+// verifyingContract = the shared GatewayWalletBatched contract
+const EIP712_DOMAIN = {
+  name: "GatewayWalletBatched",
+  version: "1",
+  chainId: 5042002,
+  verifyingContract: GATEWAY_WALLET_CONTRACT,
+};
 
 // EIP-3009 TransferWithAuthorization types
 const TRANSFER_WITH_AUTHORIZATION_TYPES = {
@@ -53,23 +62,30 @@ const TRANSFER_WITH_AUTHORIZATION_TYPES = {
 // Mode A: Gateway Wallet (offchain EIP-3009 + Circle batch settle)
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Deposit native USDC into the GatewayWalletBatched contract.
+ * This credits the platform EOA's balance within the shared contract.
+ */
 export async function depositToGateway(env: Env, amountUsdc: number): Promise<string> {
-  if (!env.GATEWAY_WALLET_ADDRESS) {
-    throw new Error("GATEWAY_WALLET_ADDRESS not configured");
-  }
   const provider = new ethers.JsonRpcProvider(env.ARC_RPC_URL || ARC_TESTNET_RPC);
   const wallet = new ethers.Wallet(env.GATEWAY_PRIVATE_KEY, provider);
-  const gatewayWallet = new ethers.Contract(env.GATEWAY_WALLET_ADDRESS, GATEWAY_WALLET_ABI, wallet);
+  const gateway = new ethers.Contract(GATEWAY_WALLET_CONTRACT, GATEWAY_WALLET_ABI, wallet);
   const value = ethers.parseEther(String(amountUsdc));
-  const tx = await gatewayWallet.deposit({ value });
+  const tx = await gateway.deposit({ value });
   const receipt = await tx.wait();
-  console.log(`[gateway] Deposited ${amountUsdc} USDC to Gateway Wallet (tx: ${receipt.hash})`);
+  console.log(`[gateway] Deposited ${amountUsdc} USDC to Gateway (tx: ${receipt.hash})`);
   return receipt.hash;
 }
 
+/**
+ * Sign an EIP-3009 TransferWithAuthorization.
+ *
+ * `from` = platform EOA (the depositor whose balance is tracked in the contract)
+ * `to` = recipient viewer address
+ * Signed by the platform EOA private key against the GatewayWalletBatched domain.
+ */
 async function signNanopayment(
   wallet: ethers.Wallet,
-  gatewayWalletAddress: string,
   to: string,
   amountUsdc: number
 ): Promise<{ payload: Record<string, unknown>; nonce: string }> {
@@ -79,7 +95,7 @@ async function signNanopayment(
   const validBefore = now + NANOPAYMENT_VALIDITY_SECONDS;
 
   const authorization = {
-    from: gatewayWalletAddress,
+    from: wallet.address,  // EOA = the depositor in the shared Gateway contract
     to,
     value: value.toString(),
     validAfter: 0,
@@ -88,7 +104,7 @@ async function signNanopayment(
   };
 
   const signature = await wallet.signTypedData(
-    getEIP712Domain(gatewayWalletAddress),
+    EIP712_DOMAIN,
     TRANSFER_WITH_AUTHORIZATION_TYPES,
     authorization
   );
@@ -104,6 +120,10 @@ async function signNanopayment(
   };
 }
 
+/**
+ * Submit a signed nanopayment to Circle's Gateway settlement API.
+ * Gateway locks funds instantly, then batches on-chain settlement.
+ */
 async function settleViaGateway(
   payload: Record<string, unknown>,
   recipientAddress: string,
@@ -115,9 +135,8 @@ async function settleViaGateway(
     paymentRequirements: {
       scheme: "exact",
       network: GATEWAY_NETWORK,
-      maxAmountRequired: value.toString(),
-      resource: `hat:attention:${recipientAddress}`,
-      description: "HAT verified attention micropayment",
+      asset: USDC_ADDRESS,
+      amount: value.toString(),
       payTo: recipientAddress,
       maxTimeoutSeconds: 300,
     },
@@ -171,30 +190,28 @@ async function sendDirectTransfer(
  * If GATEWAY_WALLET_ADDRESS is set → signs EIP-3009 offchain and submits
  * to Circle's batch settlement (gas-free per payment).
  *
- * Otherwise → falls back to a direct native USDC transfer on Arc
- * (costs gas per tx, but works without Gateway provisioning).
+ * Otherwise → falls back to a direct native USDC transfer on Arc.
  */
 export async function sendNanopayment(
   env: Env,
   recipientAddress: string,
   amountUsdc: number
 ): Promise<NanopaymentResult> {
-  // Mode A: Gateway Wallet nanopayments (preferred)
+  // Mode A: Gateway nanopayments (preferred)
   if (env.GATEWAY_WALLET_ADDRESS) {
     const wallet = new ethers.Wallet(env.GATEWAY_PRIVATE_KEY);
-    const { payload } = await signNanopayment(wallet, env.GATEWAY_WALLET_ADDRESS, recipientAddress, amountUsdc);
+    const { payload } = await signNanopayment(wallet, recipientAddress, amountUsdc);
     return settleViaGateway(payload, recipientAddress, amountUsdc);
   }
 
   // Mode B: Direct native USDC transfer (fallback)
-  console.log("[gateway] No Gateway Wallet configured — using direct transfer");
+  console.log("[gateway] No GATEWAY_WALLET_ADDRESS — using direct transfer");
   return sendDirectTransfer(env, recipientAddress, amountUsdc);
 }
 
 export async function getGatewayBalance(env: Env): Promise<string> {
   const provider = new ethers.JsonRpcProvider(env.ARC_RPC_URL || ARC_TESTNET_RPC);
-  // Check the Gateway Wallet if set, otherwise the platform EOA
-  const address = env.GATEWAY_WALLET_ADDRESS || new ethers.Wallet(env.GATEWAY_PRIVATE_KEY).address;
+  const address = new ethers.Wallet(env.GATEWAY_PRIVATE_KEY).address;
   const balance = await provider.getBalance(address);
   return ethers.formatEther(balance);
 }
@@ -205,4 +222,8 @@ export function getPlatformAddress(env: Env): string {
 
 export function getGatewayWalletAddress(env: Env): string | null {
   return env.GATEWAY_WALLET_ADDRESS || null;
+}
+
+export function getGatewayContract(): string {
+  return GATEWAY_WALLET_CONTRACT;
 }
