@@ -213,20 +213,62 @@ function isAdLikeIframe(el: HTMLIFrameElement): boolean {
   return false;
 }
 
-let adRotationIndex = 0;
+// ── Smart ad rotation ───────────────────────────────────────
+// Each slot gets a unique ad. On each rotation cycle, every slot
+// advances to the next ad it hasn't recently shown, with a smooth
+// crossfade transition. No two visible slots show the same ad at
+// the same time (when enough ads are available).
 
-function createHatAd(ad: Ad, matchedSize?: { width: string; height: string }): HTMLElement {
-  const container = document.createElement("div");
-  container.className = "hat-replaced-ad";
-  container.dataset.adId = ad.id;
-  container.style.cssText = `
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    overflow:hidden;border-radius:12px;border:1px solid rgba(99,102,241,0.15);
-    background:rgba(15,11,46,0.04);backdrop-filter:blur(8px);
-    box-shadow:0 2px 12px rgba(99,102,241,0.06);position:relative;
-    ${matchedSize ? `width:${matchedSize.width};height:${matchedSize.height};` : "padding:12px;"}
-  `;
-  container.innerHTML = `
+const ROTATION_INTERVAL = 12_000; // 12s between rotations
+const CROSSFADE_MS = 600;
+
+interface SlotState {
+  container: HTMLElement;
+  adIndex: number;
+  size?: { width: string; height: string };
+}
+
+const activeSlots: SlotState[] = [];
+let rotationTimer: number | null = null;
+
+/** Fisher-Yates shuffle, returns new array */
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Build an assignment of ad indices to N slots so no index repeats (if possible) */
+function assignUniqueIndices(slotCount: number, adCount: number, avoid: number[]): number[] {
+  if (adCount === 0) return [];
+  if (adCount === 1) return Array(slotCount).fill(0);
+
+  // Build pool: all indices shuffled, try to avoid the ones in `avoid`
+  const pool = shuffle([...Array(adCount).keys()]);
+  const result: number[] = [];
+  const used = new Set<number>();
+
+  for (let i = 0; i < slotCount; i++) {
+    // Prefer an index not used in this batch AND different from what the slot previously showed
+    let pick = pool.find((idx) => !used.has(idx) && idx !== avoid[i]);
+    // Fall back: any unused index
+    if (pick === undefined) pick = pool.find((idx) => !used.has(idx));
+    // Last resort: wrap (more slots than ads)
+    if (pick === undefined) {
+      used.clear();
+      pick = pool.find((idx) => idx !== avoid[i]) ?? pool[0];
+    }
+    result.push(pick);
+    used.add(pick);
+  }
+  return result;
+}
+
+function buildAdHtml(ad: Ad): string {
+  return `
     <a href="${ad.target_url}" target="_blank" rel="noopener" style="display:block;width:100%;height:100%;border-radius:12px;overflow:hidden;">
       <img src="${ad.image_url}" alt="${ad.title}"
         style="width:100%;height:100%;object-fit:cover;transition:transform .2s,filter .2s;"
@@ -239,7 +281,70 @@ function createHatAd(ad: Ad, matchedSize?: { width: string; height: string }): H
       HAT · ${ad.title}
     </div>
   `;
+}
+
+function createHatAd(ad: Ad, matchedSize?: { width: string; height: string }): HTMLElement {
+  const container = document.createElement("div");
+  container.className = "hat-replaced-ad";
+  container.dataset.adId = ad.id;
+  container.style.cssText = `
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    overflow:hidden;border-radius:12px;border:1px solid rgba(99,102,241,0.15);
+    background:rgba(15,11,46,0.04);backdrop-filter:blur(8px);
+    box-shadow:0 2px 12px rgba(99,102,241,0.06);position:relative;
+    transition:opacity ${CROSSFADE_MS}ms ease;
+    ${matchedSize ? `width:${matchedSize.width};height:${matchedSize.height};` : "padding:12px;"}
+  `;
+  container.innerHTML = buildAdHtml(ad);
   return container;
+}
+
+/** Crossfade a slot to a new ad */
+function transitionSlot(slot: SlotState, newAd: Ad) {
+  const el = slot.container;
+  // End current view session
+  const oldAdId = el.dataset.adId!;
+  if (activeSessions.has(oldAdId)) {
+    const session = activeSessions.get(oldAdId)!;
+    clearInterval(session.heartbeatTimer);
+    endViewSession(session.sessionId);
+    activeSessions.delete(oldAdId);
+  }
+
+  // Fade out
+  el.style.opacity = "0";
+  setTimeout(() => {
+    el.dataset.adId = newAd.id;
+    el.innerHTML = buildAdHtml(newAd);
+    // Fade in
+    el.style.opacity = "1";
+    // Start new view tracking
+    viewObserver.unobserve(el);
+    viewObserver.observe(el);
+  }, CROSSFADE_MS);
+}
+
+/** Rotate all active slots to their next ad */
+function rotateAllSlots() {
+  if (cachedAds.length <= 1 || activeSlots.length === 0) return;
+
+  const currentIndices = activeSlots.map((s) => s.adIndex);
+  const newIndices = assignUniqueIndices(activeSlots.length, cachedAds.length, currentIndices);
+
+  // Stagger the transitions slightly for a wave effect
+  activeSlots.forEach((slot, i) => {
+    const newIdx = newIndices[i];
+    if (newIdx === slot.adIndex) return; // same ad, skip
+    setTimeout(() => {
+      slot.adIndex = newIdx;
+      transitionSlot(slot, cachedAds[newIdx]);
+    }, i * 150); // 150ms stagger between slots
+  });
+}
+
+function startRotationTimer() {
+  if (rotationTimer !== null) return;
+  rotationTimer = window.setInterval(rotateAllSlots, ROTATION_INTERVAL);
 }
 
 function replaceElement(el: Element) {
@@ -250,22 +355,29 @@ function replaceElement(el: Element) {
   if (el.classList?.contains("hat-replaced-ad")) return;
 
   const rect = el.getBoundingClientRect();
-  // Use offsetWidth/offsetHeight as fallback (works before layout)
   const w = rect.width || (el as HTMLElement).offsetWidth || 0;
   const h = rect.height || (el as HTMLElement).offsetHeight || 0;
 
-  const ad = cachedAds[adRotationIndex % cachedAds.length];
-  adRotationIndex++;
+  // Pick an ad index unique from other active slots
+  const usedIndices = activeSlots.map((s) => s.adIndex);
+  const newIndices = assignUniqueIndices(1, cachedAds.length, usedIndices);
+  const adIndex = newIndices[0];
+  const ad = cachedAds[adIndex];
 
   const size = w > 10 && h > 10
     ? { width: `${w}px`, height: `${h}px` }
-    : undefined; // let it auto-size
+    : undefined;
 
   const hatAd = createHatAd(ad, size);
   replacedElements.add(hatAd);
 
+  const slot: SlotState = { container: hatAd, adIndex, size };
+  activeSlots.push(slot);
+
   el.replaceWith(hatAd);
   viewObserver.observe(hatAd);
+
+  startRotationTimer();
 }
 
 function scanAndReplace() {
@@ -331,9 +443,61 @@ const mutationObserver = new MutationObserver((mutations) => {
 
 // ── Sidebar ──────────────────────────────────────────────────
 
+// ── Sidebar with rotation ───────────────────────────────────
+
+const sidebarSlots: { el: HTMLElement; adIndex: number }[] = [];
+
+function buildSidebarSlotHtml(ad: Ad): string {
+  return `
+    <a href="${ad.target_url}" target="_blank">
+      <img src="${ad.image_url}" alt="${ad.title}" />
+    </a>
+    <div class="hat-ad-label">${ad.title}</div>
+  `;
+}
+
+function rotateSidebarSlots() {
+  if (cachedAds.length <= 1 || sidebarSlots.length === 0) return;
+
+  const currentIndices = sidebarSlots.map((s) => s.adIndex);
+  const newIndices = assignUniqueIndices(sidebarSlots.length, cachedAds.length, currentIndices);
+
+  sidebarSlots.forEach((slot, i) => {
+    const newIdx = newIndices[i];
+    if (newIdx === slot.adIndex) return;
+
+    setTimeout(() => {
+      const oldAdId = slot.el.dataset.adId!;
+      if (activeSessions.has(oldAdId)) {
+        const session = activeSessions.get(oldAdId)!;
+        clearInterval(session.heartbeatTimer);
+        endViewSession(session.sessionId);
+        activeSessions.delete(oldAdId);
+      }
+
+      slot.el.style.opacity = "0";
+      slot.el.style.transform = "translateY(4px)";
+      setTimeout(() => {
+        const ad = cachedAds[newIdx];
+        slot.adIndex = newIdx;
+        slot.el.dataset.adId = ad.id;
+        slot.el.innerHTML = buildSidebarSlotHtml(ad);
+        slot.el.style.opacity = "1";
+        slot.el.style.transform = "none";
+        viewObserver.unobserve(slot.el);
+        viewObserver.observe(slot.el);
+      }, CROSSFADE_MS);
+    }, i * 200);
+  });
+}
+
 function createSidebar(ads: Ad[]) {
   const sidebar = document.createElement("div");
   sidebar.id = "hat-sidebar";
+
+  // Show up to 3 unique sidebar slots (or fewer if not enough ads)
+  const slotCount = Math.min(3, ads.length);
+  const indices = assignUniqueIndices(slotCount, ads.length, []);
 
   sidebar.innerHTML = `
     <div class="hat-header">
@@ -341,25 +505,27 @@ function createSidebar(ads: Ad[]) {
       <span id="hat-session-earnings" style="font-size:12px;font-weight:600;color:#fbbf24;">$0.00 USDC · 0 HAT</span>
     </div>
     <div class="hat-earnings">Earning USDC nanopayments + HAT bonus</div>
-    ${ads
-      .map(
-        (ad) => `
-      <div class="hat-ad-slot" data-ad-id="${ad.id}">
-        <a href="${ad.target_url}" target="_blank">
-          <img src="${ad.image_url}" alt="${ad.title}" />
-        </a>
-        <div class="hat-ad-label">${ad.title}</div>
-      </div>
-    `
-      )
-      .join("")}
   `;
+
+  for (let i = 0; i < slotCount; i++) {
+    const ad = ads[indices[i]];
+    const slotEl = document.createElement("div");
+    slotEl.className = "hat-ad-slot";
+    slotEl.dataset.adId = ad.id;
+    slotEl.style.cssText = `transition: opacity ${CROSSFADE_MS}ms ease, transform ${CROSSFADE_MS}ms ease;`;
+    slotEl.innerHTML = buildSidebarSlotHtml(ad);
+    sidebar.appendChild(slotEl);
+    sidebarSlots.push({ el: slotEl, adIndex: indices[i] });
+  }
 
   document.body.appendChild(sidebar);
   document.body.classList.add("hat-active");
   updateEarningsDisplay();
 
-  sidebar.querySelectorAll(".hat-ad-slot").forEach((slot) => viewObserver.observe(slot));
+  sidebarSlots.forEach((s) => viewObserver.observe(s.el));
+
+  // Rotate sidebar ads on the same interval
+  setInterval(rotateSidebarSlots, ROTATION_INTERVAL);
 }
 
 // ── Cleanup on unload ────────────────────────────────────────
@@ -393,11 +559,6 @@ window.addEventListener("beforeunload", () => {
     attributeFilter: ["class", "id", "data-ad", "data-ad-slot"],
   });
 
-  // Re-scan periodically — SPAs can swap entire page content
-  let scanCount = 0;
-  const scanInterval = setInterval(() => {
-    scanAndReplace();
-    scanCount++;
-    if (scanCount >= 12) clearInterval(scanInterval); // 60s total
-  }, 5000);
+  // Re-scan periodically for SPAs that swap page content
+  setInterval(scanAndReplace, 8000);
 })();

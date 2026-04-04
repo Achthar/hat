@@ -33,13 +33,27 @@ interface Campaign {
   budget_spent_usdc: number;
 }
 
+interface GatewayStatus {
+  enabled: boolean;
+  platformAddress?: string;
+  gatewayWallet?: string;
+  balance?: string;
+}
+
+interface AdvertiserBalance {
+  totalDeposited: number;
+  totalSpent: number;
+  available: number;
+}
+
 export function Dashboard() {
   const { address, connect, connecting } = useWallet();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [form, setForm] = useState({ title: "", imageUrl: "", targetUrl: "", budgetUsdc: "" });
   const [depositStatus, setDepositStatus] = useState("");
   const [nativeBalance, setNativeBalance] = useState<string | null>(null);
-  const [gatewayStatus, setGatewayStatus] = useState<{ enabled: boolean; balance?: string } | null>(null);
+  const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus | null>(null);
+  const [advBalance, setAdvBalance] = useState<AdvertiserBalance | null>(null);
 
   useEffect(() => {
     if (!address) return;
@@ -49,13 +63,13 @@ export function Dashboard() {
       .catch(() => {});
     loadBalance(address);
     loadGatewayStatus();
+    loadAdvertiserBalance(address);
   }, [address]);
 
   async function loadBalance(addr: string) {
     if (!window.ethereum) return;
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-      // On Arc, USDC is the native gas token
       const bal = await provider.getBalance(addr);
       setNativeBalance(ethers.formatEther(bal));
     } catch {
@@ -66,10 +80,19 @@ export function Dashboard() {
   async function loadGatewayStatus() {
     try {
       const res = await fetch(`${API_BASE}/nanopayments/status`);
-      const data = await res.json();
-      setGatewayStatus(data);
+      setGatewayStatus(await res.json());
     } catch {
       setGatewayStatus({ enabled: false });
+    }
+  }
+
+  async function loadAdvertiserBalance(addr: string) {
+    try {
+      const res = await fetch(`${API_BASE}/nanopayments/balance/${addr}`);
+      const data = await res.json();
+      setAdvBalance({ totalDeposited: data.totalDeposited, totalSpent: data.totalSpent, available: data.available });
+    } catch {
+      // Not available yet
     }
   }
 
@@ -96,8 +119,17 @@ export function Dashboard() {
   }
 
   async function fundGatewayWallet(amount: number) {
-    if (!window.ethereum || !address || !gatewayStatus?.enabled) {
+    if (!window.ethereum || !address) {
+      setDepositStatus("Connect wallet first");
+      return;
+    }
+
+    // Determine where to send: Gateway Wallet contract if configured, else platform EOA
+    const target = gatewayStatus?.gatewayWallet || gatewayStatus?.platformAddress;
+    if (!target) {
       setDepositStatus("Gateway not configured — deposit simulated for demo");
+      // Still record in DB for demo purposes
+      await recordDeposit(address, amount, null);
       return;
     }
 
@@ -107,24 +139,37 @@ export function Dashboard() {
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
 
-    // On Arc, USDC is native — send directly to the platform Gateway wallet
-    setDepositStatus("Depositing USDC to Gateway...");
+    setDepositStatus("Depositing USDC to Gateway Wallet...");
     try {
-      const res = await fetch(`${API_BASE}/nanopayments/status`);
-      const data = await res.json();
-      if (!data.address) throw new Error("Gateway wallet address not available");
-
+      // Native USDC send to the Gateway Wallet contract (or platform EOA)
       const tx = await signer.sendTransaction({
-        to: data.address,
+        to: target,
         value: ethers.parseEther(String(amount)),
       });
-      await tx.wait();
+      const receipt = await tx.wait();
+      const txHash = receipt?.hash ?? null;
+
+      // Record deposit in backend DB for per-advertiser accounting
+      await recordDeposit(address, amount, txHash);
 
       setDepositStatus("Deposit complete! USDC is now available for gas-free nanopayments.");
       loadBalance(address);
       loadGatewayStatus();
+      loadAdvertiserBalance(address);
     } catch (e) {
       setDepositStatus(`Deposit failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  async function recordDeposit(advertiserAddress: string, amountUsdc: number, txHash: string | null) {
+    try {
+      await fetch(`${API_BASE}/nanopayments/record-deposit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ advertiserAddress, amountUsdc, txHash }),
+      });
+    } catch {
+      // Non-critical — DB record failed but on-chain deposit succeeded
     }
   }
 
@@ -218,33 +263,52 @@ export function Dashboard() {
       </nav>
 
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "0 32px 64px" }}>
-        <p style={{ color: c.muted, fontSize: 15, marginTop: 0, marginBottom: 32 }}>
+        <p style={{ color: c.muted, fontSize: 15, marginTop: 0, marginBottom: 24 }}>
           Create ad campaigns and fund them with USDC on Arc. Viewers receive gas-free nanopayments for verified attention.
         </p>
 
-        {/* ── Gateway Status Badge ─────────────────────── */}
-        {gatewayStatus && (
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              background: gatewayStatus.enabled ? "#f0fdf4" : c.roseBg,
-              border: `1px solid ${gatewayStatus.enabled ? "#bbf7d0" : "#fecdd3"}`,
-              borderRadius: 100,
-              padding: "6px 14px",
-              fontSize: 12,
-              fontWeight: 600,
-              color: gatewayStatus.enabled ? "#16a34a" : c.rose,
-              marginBottom: 20,
-            }}
-          >
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />
-            {gatewayStatus.enabled
-              ? `Nanopayments Active · Gateway: ${Number(gatewayStatus.balance || 0).toFixed(2)} USDC`
-              : "Nanopayments Not Configured"}
-          </div>
-        )}
+        {/* ── Gateway + Advertiser Balance Badges ─────── */}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+          {gatewayStatus && (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: gatewayStatus.enabled ? "#f0fdf4" : c.roseBg,
+                border: `1px solid ${gatewayStatus.enabled ? "#bbf7d0" : "#fecdd3"}`,
+                borderRadius: 100,
+                padding: "6px 14px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: gatewayStatus.enabled ? "#16a34a" : c.rose,
+              }}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />
+              {gatewayStatus.enabled
+                ? `Gateway Active · Pool: ${Number(gatewayStatus.balance || 0).toFixed(2)} USDC`
+                : "Gateway Not Configured"}
+            </div>
+          )}
+          {advBalance && (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: c.indigoBg,
+                border: `1px solid ${c.border}`,
+                borderRadius: 100,
+                padding: "6px 14px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: c.indigo,
+              }}
+            >
+              Deposited: ${advBalance.totalDeposited.toFixed(2)} · Spent: ${advBalance.totalSpent.toFixed(4)} · Available: ${advBalance.available.toFixed(2)}
+            </div>
+          )}
+        </div>
 
         {!address ? (
           <div
@@ -296,7 +360,8 @@ export function Dashboard() {
                 Create Campaign
               </h2>
               <p style={{ margin: "0 0 20px", fontSize: 13, color: c.muted }}>
-                USDC funds gas-free nanopayments to viewers. Viewers also earn bonus HAT tokens.
+                USDC is deposited into the Circle Gateway Wallet for gas-free nanopayments to viewers.
+                Viewers also earn bonus HAT tokens proportional to USDC earned.
               </p>
               <form onSubmit={createCampaign} style={{ display: "grid", gap: 14 }}>
                 <input
@@ -330,7 +395,7 @@ export function Dashboard() {
                   required
                 />
                 <button type="submit" style={{ ...btnPrimary, padding: 14, fontSize: 15, width: "100%" }}>
-                  Create Campaign & Fund Gateway
+                  Create Campaign & Deposit to Gateway
                 </button>
               </form>
               {depositStatus && (
@@ -400,7 +465,6 @@ export function Dashboard() {
                             {remaining > 0 ? "Active" : "Depleted"}
                           </span>
                         </div>
-                        {/* Budget bar */}
                         <div style={{ height: 6, background: c.indigoBg, borderRadius: 100, marginBottom: 12, overflow: "hidden" }}>
                           <div
                             style={{

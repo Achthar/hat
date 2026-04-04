@@ -78,3 +78,24 @@ export async function getSettlements(db: D1): Promise<Row[]> {
   const result = await db.prepare("SELECT * FROM settlements ORDER BY settled_at DESC LIMIT 50").all();
   return result.results as Row[];
 }
+
+// ── Gateway deposit tracking ────────────────────────────────────
+
+export async function insertGatewayDeposit(db: D1, id: string, advertiserAddress: string, amountUsdc: number, txHash: string | null) {
+  await db.prepare("INSERT INTO gateway_deposits (id, advertiser_address, amount_usdc, tx_hash) VALUES (?, ?, ?, ?)").bind(id, advertiserAddress, amountUsdc, txHash).run();
+}
+
+export async function getAdvertiserDeposits(db: D1, advertiserAddress: string): Promise<Row[]> {
+  const result = await db.prepare("SELECT * FROM gateway_deposits WHERE advertiser_address = ? ORDER BY created_at DESC").bind(advertiserAddress).all();
+  return result.results as Row[];
+}
+
+export async function getAdvertiserTotalDeposited(db: D1, advertiserAddress: string): Promise<number> {
+  const result = await db.prepare("SELECT COALESCE(SUM(amount_usdc), 0) as total FROM gateway_deposits WHERE advertiser_address = ?").bind(advertiserAddress).first();
+  return (result?.total as number) ?? 0;
+}
+
+export async function getAdvertiserTotalSpent(db: D1, advertiserAddress: string): Promise<number> {
+  const result = await db.prepare("SELECT COALESCE(SUM(budget_spent_usdc), 0) as total FROM ads WHERE advertiser_address = ?").bind(advertiserAddress).first();
+  return (result?.total as number) ?? 0;
+}
