@@ -8,7 +8,7 @@ import { DEFAULT_API_URL } from "@hat/common";
 
 const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 const APP_ID = (import.meta.env.VITE_WORLD_ID_APP_ID || "app_staging_0000") as `app_${string}`;
-
+console.log('APP_ID', APP_ID)
 export function Verify() {
   const { user, connect, refreshUser } = useWallet();
   const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");

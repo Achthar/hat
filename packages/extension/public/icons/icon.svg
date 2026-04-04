@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+
+  <!-- All letters: same box 30,28 → 98,100 (w=68, h=72), bar=11, centered -->
+
+  <!-- H — rose/pink -->
+  <g fill="#fb7185" opacity="0.85">
+    <rect x="30" y="28" width="11" height="72" rx="3"/>
+    <rect x="30" y="58" width="68" height="11" rx="3"/>
+    <rect x="87" y="28" width="11" height="72" rx="3"/>
+  </g>
+
+  <!-- T — amber/gold -->
+  <g fill="#fbbf24" opacity="0.85">
+    <rect x="30" y="28" width="68" height="11" rx="3"/>
+    <rect x="58.5" y="28" width="11" height="72" rx="3"/>
+  </g>
+
+  <!-- A — white -->
+  <g fill="white" opacity="0.95">
+    <rect x="30" y="28" width="11" height="72" rx="3"/>
+    <rect x="87" y="28" width="11" height="72" rx="3"/>
+    <rect x="30" y="28" width="68" height="11" rx="3"/>
+    <rect x="30" y="58" width="68" height="11" rx="3"/>
+  </g>
+</svg>

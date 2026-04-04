@@ -7,7 +7,10 @@ export function Home() {
   return (
     <main style={{ maxWidth: 960, margin: "0 auto", padding: 32 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>HAT - Human Attention Token</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <img src="/hat-logo.svg" alt="HAT" width={48} height={48} />
+          <h1 style={{ margin: 0 }}>HAT - Human Attention Token</h1>
+        </div>
         {user.address ? (
           <div style={{ fontSize: 14, color: "#6b7280" }}>
             {user.address.slice(0, 6)}...{user.address.slice(-4)}
