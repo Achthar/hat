@@ -4,4 +4,6 @@ export type Env = {
   WORLD_ID_SIGNING_KEY: string;
   DEPLOYER_PRIVATE_KEY: string;
   ARC_RPC_URL: string;
+  // Circle Gateway nanopayments
+  GATEWAY_PRIVATE_KEY: string; // Platform wallet key for signing nanopayments
 };

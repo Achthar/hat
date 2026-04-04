@@ -19,7 +19,7 @@ export interface ViewSession {
   verified: boolean; // World ID verified
   settled: boolean;
   usdcEarned: number;
-  hatEarned: number;
+  hatEarned: number; // derived from USDC: usdcEarned * HAT_PER_USDC
 }
 
 export interface WorldIdProof {
@@ -52,6 +52,21 @@ export interface SettlementBatch {
   recipients: `0x${string}`[];
   usdcAmounts: bigint[];
   hatAmounts: bigint[];
-  txHash?: string;
+  nanopaymentTxIds: string[]; // Circle Gateway transaction IDs
+  hatTxHash?: string; // on-chain HAT batch mint tx
   settledAt?: number;
+}
+
+// Circle Gateway nanopayment types
+export interface NanopaymentResult {
+  success: boolean;
+  payer: string;
+  transaction: string; // Circle Gateway transaction ID
+  network: string;
+}
+
+export interface GatewayBalance {
+  total: bigint;
+  available: bigint;
+  pending: bigint;
 }

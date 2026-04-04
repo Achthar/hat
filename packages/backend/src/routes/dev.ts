@@ -10,10 +10,13 @@ devRoutes.post("/seed", async (c) => {
   const advAddr = "0xAdvertiser0000000000000000000001";
   await db.upsertUser(d1, advAddr);
 
+  // Banner base — use frontend origin if provided, fall back to localhost for dev
+  const bannerBase = (c.req.header("origin") || "http://localhost:3000") + "/banners";
+
   const ads = [
-    { id: "demo-ad-1", title: "World App — Proof of Human", imageUrl: "https://placehold.co/600x300/6366f1/white?text=World+App", targetUrl: "https://world.org", budget: 50 },
-    { id: "demo-ad-2", title: "Circle USDC — Digital Dollars", imageUrl: "https://placehold.co/600x300/2563eb/white?text=USDC+on+Arc", targetUrl: "https://circle.com", budget: 30 },
-    { id: "demo-ad-3", title: "HAT — Earn While You Browse", imageUrl: "https://placehold.co/600x300/16a34a/white?text=HAT+Token", targetUrl: "http://localhost:3000", budget: 20 },
+    { id: "demo-ad-1", title: "World App — Proof of Human", imageUrl: `${bannerBase}/world-app.svg`, targetUrl: "https://world.org", budget: 50 },
+    { id: "demo-ad-2", title: "Circle USDC — Digital Dollars", imageUrl: `${bannerBase}/circle-usdc.svg`, targetUrl: "https://circle.com", budget: 30 },
+    { id: "demo-ad-3", title: "HAT — Earn While You Browse", imageUrl: `${bannerBase}/hat-token.svg`, targetUrl: "http://localhost:3000", budget: 20 },
   ];
 
   for (const ad of ads) {

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { RATE_PER_SECOND_USDC, HAT_PER_SECOND } from "@hat/common";
+import { RATE_PER_SECOND_USDC, HAT_PER_USDC } from "@hat/common";
 import type { Env } from "../types.js";
 import * as db from "../db.js";
 
@@ -36,7 +36,7 @@ viewRoutes.post("/end", async (c) => {
     const endedAt = Date.now();
     const durationSeconds = Math.floor((endedAt - (session.started_at as number)) / 1000);
     const usdcEarned = durationSeconds * RATE_PER_SECOND_USDC;
-    const hatEarned = durationSeconds * HAT_PER_SECOND;
+    const hatEarned = usdcEarned * HAT_PER_USDC;
 
     await db.endSession(c.env.DB, sessionId, endedAt, durationSeconds, usdcEarned, hatEarned);
 

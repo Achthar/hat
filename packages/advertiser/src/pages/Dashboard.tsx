@@ -1,17 +1,11 @@
 import { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import { PAYOUT_VAULT_ABI, CONTRACTS, ARC_TESTNET_CHAIN_ID } from "@hat/common";
+import { ARC_TESTNET_CHAIN_ID } from "@hat/common";
 import { useWallet } from "../hooks/useWallet.js";
 
 import { DEFAULT_API_URL } from "@hat/common";
 
 const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
-
-const USDC_ABI = [
-  "function approve(address spender, uint256 amount) external returns (bool)",
-  "function allowance(address owner, address spender) external view returns (uint256)",
-  "function balanceOf(address account) external view returns (uint256)",
-];
 
 const c = {
   indigo: "#6366f1",
@@ -44,7 +38,8 @@ export function Dashboard() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [form, setForm] = useState({ title: "", imageUrl: "", targetUrl: "", budgetUsdc: "" });
   const [depositStatus, setDepositStatus] = useState("");
-  const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
+  const [nativeBalance, setNativeBalance] = useState<string | null>(null);
+  const [gatewayStatus, setGatewayStatus] = useState<{ enabled: boolean; balance?: string } | null>(null);
 
   useEffect(() => {
     if (!address) return;
@@ -53,17 +48,28 @@ export function Dashboard() {
       .then((data) => setCampaigns(data.ads))
       .catch(() => {});
     loadBalance(address);
+    loadGatewayStatus();
   }, [address]);
 
   async function loadBalance(addr: string) {
-    if (!CONTRACTS.USDC || !window.ethereum) return;
+    if (!window.ethereum) return;
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const usdc = new ethers.Contract(CONTRACTS.USDC, USDC_ABI, provider);
-      const bal = await usdc.balanceOf(addr);
-      setUsdcBalance(ethers.formatUnits(bal, 6));
+      // On Arc, USDC is the native gas token
+      const bal = await provider.getBalance(addr);
+      setNativeBalance(ethers.formatEther(bal));
     } catch {
-      // Contract not deployed yet
+      // Not connected to Arc
+    }
+  }
+
+  async function loadGatewayStatus() {
+    try {
+      const res = await fetch(`${API_BASE}/nanopayments/status`);
+      const data = await res.json();
+      setGatewayStatus(data);
+    } catch {
+      setGatewayStatus({ enabled: false });
     }
   }
 
@@ -82,16 +88,16 @@ export function Dashboard() {
             chainId: `0x${ARC_TESTNET_CHAIN_ID.toString(16)}`,
             chainName: "Arc Testnet",
             rpcUrls: ["https://testnet-rpc.arc.circle.com"],
-            nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+            nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
           },
         ],
       });
     }
   }
 
-  async function depositUsdc(amount: number) {
-    if (!window.ethereum || !address || !CONTRACTS.PAYOUT_VAULT || !CONTRACTS.USDC) {
-      setDepositStatus("Contracts not deployed yet — deposit simulated for demo");
+  async function fundGatewayWallet(amount: number) {
+    if (!window.ethereum || !address || !gatewayStatus?.enabled) {
+      setDepositStatus("Gateway not configured — deposit simulated for demo");
       return;
     }
 
@@ -101,19 +107,25 @@ export function Dashboard() {
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
 
-    setDepositStatus("Approving USDC...");
-    const usdc = new ethers.Contract(CONTRACTS.USDC, USDC_ABI, signer);
-    const amountWei = ethers.parseUnits(String(amount), 6);
-    const approveTx = await usdc.approve(CONTRACTS.PAYOUT_VAULT, amountWei);
-    await approveTx.wait();
+    // On Arc, USDC is native — send directly to the platform Gateway wallet
+    setDepositStatus("Depositing USDC to Gateway...");
+    try {
+      const res = await fetch(`${API_BASE}/nanopayments/status`);
+      const data = await res.json();
+      if (!data.address) throw new Error("Gateway wallet address not available");
 
-    setDepositStatus("Depositing to PayoutVault...");
-    const vault = new ethers.Contract(CONTRACTS.PAYOUT_VAULT, PAYOUT_VAULT_ABI, signer);
-    const depositTx = await vault.deposit(amountWei);
-    await depositTx.wait();
+      const tx = await signer.sendTransaction({
+        to: data.address,
+        value: ethers.parseEther(String(amount)),
+      });
+      await tx.wait();
 
-    setDepositStatus("Deposit complete!");
-    loadBalance(address);
+      setDepositStatus("Deposit complete! USDC is now available for gas-free nanopayments.");
+      loadBalance(address);
+      loadGatewayStatus();
+    } catch (e) {
+      setDepositStatus(`Deposit failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   async function createCampaign(e: React.FormEvent) {
@@ -133,7 +145,7 @@ export function Dashboard() {
     });
     const ad = await res.json();
 
-    await depositUsdc(Number(form.budgetUsdc));
+    await fundGatewayWallet(Number(form.budgetUsdc));
 
     setCampaigns((prev) => [
       ...prev,
@@ -183,7 +195,7 @@ export function Dashboard() {
             <span style={{ color: c.muted }}>
               {address.slice(0, 6)}...{address.slice(-4)}
             </span>
-            {usdcBalance !== null && (
+            {nativeBalance !== null && (
               <span
                 style={{
                   fontSize: 12,
@@ -194,7 +206,7 @@ export function Dashboard() {
                   borderRadius: 100,
                 }}
               >
-                {usdcBalance} USDC
+                {Number(nativeBalance).toFixed(2)} USDC
               </span>
             )}
           </div>
@@ -207,8 +219,32 @@ export function Dashboard() {
 
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "0 32px 64px" }}>
         <p style={{ color: c.muted, fontSize: 15, marginTop: 0, marginBottom: 32 }}>
-          Create ad campaigns and deposit USDC on Arc. Pay only for verified human attention.
+          Create ad campaigns and fund them with USDC on Arc. Viewers receive gas-free nanopayments for verified attention.
         </p>
+
+        {/* ── Gateway Status Badge ─────────────────────── */}
+        {gatewayStatus && (
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              background: gatewayStatus.enabled ? "#f0fdf4" : c.roseBg,
+              border: `1px solid ${gatewayStatus.enabled ? "#bbf7d0" : "#fecdd3"}`,
+              borderRadius: 100,
+              padding: "6px 14px",
+              fontSize: 12,
+              fontWeight: 600,
+              color: gatewayStatus.enabled ? "#16a34a" : c.rose,
+              marginBottom: 20,
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />
+            {gatewayStatus.enabled
+              ? `Nanopayments Active · Gateway: ${Number(gatewayStatus.balance || 0).toFixed(2)} USDC`
+              : "Nanopayments Not Configured"}
+          </div>
+        )}
 
         {!address ? (
           <div
@@ -256,9 +292,12 @@ export function Dashboard() {
                 marginBottom: 28,
               }}
             >
-              <h2 style={{ margin: "0 0 20px", fontSize: 18, fontWeight: 700, color: c.text }}>
+              <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: c.text }}>
                 Create Campaign
               </h2>
+              <p style={{ margin: "0 0 20px", fontSize: 13, color: c.muted }}>
+                USDC funds gas-free nanopayments to viewers. Viewers also earn bonus HAT tokens.
+              </p>
               <form onSubmit={createCampaign} style={{ display: "grid", gap: 14 }}>
                 <input
                   placeholder="Campaign title"
@@ -291,7 +330,7 @@ export function Dashboard() {
                   required
                 />
                 <button type="submit" style={{ ...btnPrimary, padding: 14, fontSize: 15, width: "100%" }}>
-                  Create Campaign & Deposit USDC
+                  Create Campaign & Fund Gateway
                 </button>
               </form>
               {depositStatus && (

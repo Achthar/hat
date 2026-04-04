@@ -122,7 +122,7 @@ export function Home() {
               lineHeight: 1.6,
             }}
           >
-            A marketplace for verified human attention, powered by World ID and Arc micropayments.
+            Earn USDC nanopayments for your verified attention. Powered by Circle Gateway, World ID, and Arc.
           </p>
           {!user.address && (
             <button onClick={connect} disabled={connecting} style={{ ...btnPrimary, marginTop: 28, padding: "14px 36px", fontSize: 16 }}>
@@ -149,8 +149,8 @@ export function Home() {
             { icon: "1", color: c.indigoBg, accent: c.indigo, title: "Install Extension", desc: "Add the HAT browser extension" },
             { icon: "2", color: c.roseBg, accent: c.rose, title: "Verify Humanity", desc: "Prove you're human with World ID" },
             { icon: "3", color: c.amberBg, accent: c.amber, title: "Browse the Web", desc: "See targeted ads in a sidebar" },
-            { icon: "4", color: c.indigoBg, accent: c.indigo, title: "Earn Rewards", desc: "Get USDC + HAT for every second" },
-            { icon: "5", color: c.roseBg, accent: c.rose, title: "No Bots", desc: "Advertisers pay only for real views" },
+            { icon: "4", color: c.indigoBg, accent: c.indigo, title: "Earn USDC", desc: "Gas-free nanopayments for every second" },
+            { icon: "5", color: c.roseBg, accent: c.rose, title: "Bonus HAT", desc: "Earn HAT incentive tokens on top of USDC" },
           ].map((s) => (
             <div
               key={s.icon}
@@ -226,8 +226,8 @@ export function Home() {
         <section>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: c.text, marginBottom: 16 }}>Your Stats</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-            <StatCard label="HAT Earned" value={String(user.totalHatEarned)} accent={c.amber} bg={c.amberBg} />
             <StatCard label="USDC Earned" value={`$${user.totalUsdcEarned.toFixed(4)}`} accent={c.indigo} bg={c.indigoBg} />
+            <StatCard label="HAT Bonus" value={String(Math.floor(user.totalHatEarned))} accent={c.amber} bg={c.amberBg} />
             <StatCard
               label="Status"
               value={user.verified ? "Verified Human" : user.address ? "Not Verified" : "Not Connected"}

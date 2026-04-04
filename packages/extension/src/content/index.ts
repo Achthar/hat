@@ -96,7 +96,7 @@ function updateEarningsDisplay() {
   chrome.storage.local.get(["hatEarned", "usdcEarned"], (data) => {
     const el = document.getElementById("hat-session-earnings");
     if (el) {
-      el.textContent = `${Math.floor(data.hatEarned || 0)} HAT · $${(data.usdcEarned || 0).toFixed(4)}`;
+      el.textContent = `$${(data.usdcEarned || 0).toFixed(4)} USDC · ${Math.floor(data.hatEarned || 0)} HAT`;
     }
   });
 }
@@ -338,9 +338,9 @@ function createSidebar(ads: Ad[]) {
   sidebar.innerHTML = `
     <div class="hat-header">
       <span>HAT</span>
-      <span id="hat-session-earnings" style="font-size:12px;font-weight:600;color:#fbbf24;">0 HAT · $0.00</span>
+      <span id="hat-session-earnings" style="font-size:12px;font-weight:600;color:#fbbf24;">$0.00 USDC · 0 HAT</span>
     </div>
-    <div class="hat-earnings">Earning rewards for your attention</div>
+    <div class="hat-earnings">Earning USDC nanopayments + HAT bonus</div>
     ${ads
       .map(
         (ad) => `

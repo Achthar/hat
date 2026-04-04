@@ -98,8 +98,9 @@ export function Verify() {
         </h1>
         <p style={{ color: c.muted, fontSize: 15, lineHeight: 1.6, margin: "0 0 32px" }}>
           Prove you're human with World ID to start earning{" "}
-          <span style={{ color: c.amber, fontWeight: 600 }}>HAT</span> and{" "}
-          <span style={{ color: c.indigo, fontWeight: 600 }}>USDC</span>.
+          <span style={{ color: c.indigo, fontWeight: 600 }}>USDC</span> nanopayments
+          {" "}plus bonus{" "}
+          <span style={{ color: c.amber, fontWeight: 600 }}>HAT</span> tokens.
         </p>
 
         {!user.address ? (

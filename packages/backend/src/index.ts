@@ -6,6 +6,7 @@ import { viewRoutes } from "./routes/views.js";
 import { settlementRoutes } from "./routes/settlement.js";
 import { adRoutes } from "./routes/ads.js";
 import { devRoutes } from "./routes/dev.js";
+import { nanopaymentRoutes } from "./routes/nanopayments.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -16,6 +17,7 @@ app.route("/api/views", viewRoutes);
 app.route("/api/settlement", settlementRoutes);
 app.route("/api/ads", adRoutes);
 app.route("/api/dev", devRoutes);
+app.route("/api/nanopayments", nanopaymentRoutes);
 
 app.get("/api/health", (c) => c.json({ status: "ok" }));
 
