@@ -1,0 +1,5 @@
+WORLD_ID_RP_ID=your_rp_id_here
+WORLD_ID_SIGNING_KEY=your_signing_key_here
+DEPLOYER_PRIVATE_KEY=your_deployer_key_here
+GATEWAY_PRIVATE_KEY=your_gateway_key_here
+GATEWAY_WALLET_ADDRESS=your_gateway_wallet_here

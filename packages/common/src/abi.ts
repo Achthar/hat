@@ -15,5 +15,5 @@ export const HAT_TOKEN_ABI = [
   "function totalSupply() external view returns (uint256)",
   "function name() external view returns (string)",
   "function symbol() external view returns (string)",
-  "event BatchMinted(address[] recipients, uint256[] amounts, uint256 totalMinted)",
+  "event BatchMinted(uint256 recipientCount, uint256 totalMinted)",
 ] as const;
