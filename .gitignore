@@ -16,3 +16,9 @@ packages/contracts/broadcast/
 
 # Extension
 packages/extension/dist/
+
+# Backend DB
+*.db
+
+# Foundry libs
+packages/contracts/lib/
