@@ -19,7 +19,7 @@ settlementRoutes.post("/batch", async (c) => {
     const requireVerified = !includeUnverified;
 
     const result = await runSettlement(c.env.DB, c.env, requireVerified);
-    if (result.recipientCount === 0) {
+    if (result.recipientCount === 0 && result.failedPayments.length === 0) {
       return c.json({ message: "No unsettled sessions to process" });
     }
     return c.json(result);

@@ -34,8 +34,15 @@ const GATEWAY_WALLET_ABI = [
   "function deposit() external payable",
 ];
 
-// USDC token address on Arc Testnet (native gas token wrapper for EIP-3009)
+// USDC token address on Arc Testnet (ERC-20 interface to native balance, 6 decimals)
 const USDC_ADDRESS = "0x3600000000000000000000000000000000000000";
+const USDC_DECIMALS = 6; // ERC-20 USDC on Arc uses 6 decimals
+
+/** Truncate a float to a fixed number of decimal places (avoids floating point drift) */
+function truncateDecimals(n: number, decimals: number): string {
+  // Use toFixed to clamp, then strip trailing zeros for parseUnits/parseEther
+  return Number(n.toFixed(decimals)).toString();
+}
 
 // ── EIP-712 domain for GatewayWalletBatched ────────────────────
 // verifyingContract = the shared GatewayWalletBatched contract
@@ -70,7 +77,7 @@ export async function depositToGateway(env: Env, amountUsdc: number): Promise<st
   const provider = new ethers.JsonRpcProvider(env.ARC_RPC_URL || ARC_TESTNET_RPC);
   const wallet = new ethers.Wallet(env.GATEWAY_PRIVATE_KEY, provider);
   const gateway = new ethers.Contract(GATEWAY_WALLET_CONTRACT, GATEWAY_WALLET_ABI, wallet);
-  const value = ethers.parseEther(String(amountUsdc));
+  const value = ethers.parseEther(truncateDecimals(amountUsdc, 18));
   const tx = await gateway.deposit({ value });
   const receipt = await tx.wait();
   console.log(`[gateway] Deposited ${amountUsdc} USDC to Gateway (tx: ${receipt.hash})`);
@@ -89,7 +96,8 @@ async function signNanopayment(
   to: string,
   amountUsdc: number
 ): Promise<{ payload: Record<string, unknown>; nonce: string }> {
-  const value = ethers.parseEther(String(amountUsdc));
+  // Gateway operates on the ERC-20 layer (6 decimals)
+  const value = ethers.parseUnits(truncateDecimals(amountUsdc, USDC_DECIMALS), USDC_DECIMALS);
   const nonce = ethers.hexlify(ethers.randomBytes(32));
   const now = Math.floor(Date.now() / 1000);
   const validBefore = now + NANOPAYMENT_VALIDITY_SECONDS;
@@ -129,7 +137,8 @@ async function settleViaGateway(
   recipientAddress: string,
   amountUsdc: number
 ): Promise<NanopaymentResult> {
-  const value = ethers.parseEther(String(amountUsdc));
+  // Gateway operates on the ERC-20 layer (6 decimals)
+  const value = ethers.parseUnits(truncateDecimals(amountUsdc, USDC_DECIMALS), USDC_DECIMALS);
   const body = {
     paymentPayload: payload,
     paymentRequirements: {
@@ -166,7 +175,8 @@ async function sendDirectTransfer(
 ): Promise<NanopaymentResult> {
   const provider = new ethers.JsonRpcProvider(env.ARC_RPC_URL || ARC_TESTNET_RPC);
   const wallet = new ethers.Wallet(env.GATEWAY_PRIVATE_KEY, provider);
-  const value = ethers.parseEther(String(amountUsdc));
+  // Native transfers use 18 decimals
+  const value = ethers.parseEther(truncateDecimals(amountUsdc, 18));
 
   const tx = await wallet.sendTransaction({ to: recipientAddress, value });
   const receipt = await tx.wait();
@@ -192,20 +202,31 @@ async function sendDirectTransfer(
  *
  * Otherwise → falls back to a direct native USDC transfer on Arc.
  */
+/**
+ * Send a nanopayment to a viewer.
+ *
+ * Tries Gateway first (gas-free), falls back to direct transfer.
+ * Gateway requires the EOA to have deposited USDC into the
+ * GatewayWalletBatched contract — if not, direct transfer is used.
+ */
 export async function sendNanopayment(
   env: Env,
   recipientAddress: string,
   amountUsdc: number
 ): Promise<NanopaymentResult> {
-  // Mode A: Gateway nanopayments (preferred)
+  // Mode A: try Gateway nanopayments if configured
   if (env.GATEWAY_WALLET_ADDRESS) {
-    const wallet = new ethers.Wallet(env.GATEWAY_PRIVATE_KEY);
-    const { payload } = await signNanopayment(wallet, recipientAddress, amountUsdc);
-    return settleViaGateway(payload, recipientAddress, amountUsdc);
+    try {
+      const wallet = new ethers.Wallet(env.GATEWAY_PRIVATE_KEY);
+      const { payload } = await signNanopayment(wallet, recipientAddress, amountUsdc);
+      return await settleViaGateway(payload, recipientAddress, amountUsdc);
+    } catch (e) {
+      // Gateway failed (likely no deposit) — fall through to direct transfer
+      console.warn(`[gateway] Gateway settlement failed, falling back to direct transfer:`, e);
+    }
   }
 
-  // Mode B: Direct native USDC transfer (fallback)
-  console.log("[gateway] No GATEWAY_WALLET_ADDRESS — using direct transfer");
+  // Mode B: Direct native USDC transfer (18 decimals)
   return sendDirectTransfer(env, recipientAddress, amountUsdc);
 }
 
