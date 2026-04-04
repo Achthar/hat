@@ -45,6 +45,12 @@ viewRoutes.post("/end", async (c) => {
 
     await db.endSession(c.env.DB, sessionId, endedAt, durationSeconds, usdcEarned, hatEarned);
 
+    // Credit the user's running totals so /auth/user/:address stays current
+    await db.updateUserEarnings(c.env.DB, hatEarned, usdcEarned, session.user_address as string);
+
+    // Debit the ad's budget
+    await db.updateAdSpend(c.env.DB, usdcEarned, session.ad_id as string);
+
     return c.json({
       sessionId,
       durationSeconds,
@@ -73,6 +79,12 @@ viewRoutes.post("/click", async (c) => {
     const clickId = `click-${userId}-${adId}-${Date.now()}`;
 
     await db.insertClick(c.env.DB, clickId, userId, adId, sessionId ?? null, clickReward, hatReward);
+
+    // Credit click rewards to user totals and debit from ad budget
+    if (clickReward > 0) {
+      await db.updateUserEarnings(c.env.DB, hatReward, clickReward, userId);
+      await db.updateAdSpend(c.env.DB, clickReward, adId);
+    }
 
     return c.json({
       clickId,

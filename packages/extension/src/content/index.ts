@@ -372,7 +372,9 @@ function buildAdHtml(ad: Ad, shape: SlotShape = "standard"): string {
 
   const imgSrc = pickImage(ad, shape);
   return `
-    <a href="${ad.target_url}" target="_blank" rel="noopener" style="display:block;width:100%;height:100%;border-radius:12px;overflow:hidden;">
+    <a href="${ad.target_url}" target="_blank" rel="noopener"
+      style="display:block;width:100%;height:100%;border-radius:12px;overflow:hidden;
+        background:rgba(255,255,255,0.07);">
       <img src="${imgSrc}" alt="${ad.title}"
         style="width:100%;height:100%;object-fit:contain;transition:transform .2s,filter .2s;"
         onmouseenter="this.style.transform='scale(1.02)';this.style.filter='brightness(1.05)'"

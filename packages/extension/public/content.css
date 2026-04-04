@@ -95,6 +95,7 @@
   border-radius: 12px;
   overflow: hidden;
   position: relative;
+  background: rgba(255, 255, 255, 0.07);
 }
 
 #hat-sidebar .hat-ad-slot a::after {
@@ -111,6 +112,7 @@
   display: block;
   border-radius: 12px;
   cursor: pointer;
+  object-fit: contain;
   transition: transform 0.2s, filter 0.2s;
 }
 

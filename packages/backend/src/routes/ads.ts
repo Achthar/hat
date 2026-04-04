@@ -54,6 +54,46 @@ adRoutes.get("/by-advertiser/:address", async (c) => {
   return c.json({ ads });
 });
 
+/// Get detailed analytics for a single ad campaign
+adRoutes.get("/:id/analytics", async (c) => {
+  try {
+    const adId = c.req.param("id");
+    const d1 = c.env.DB;
+
+    const [views, clicks, uniqueViewers, viewUsdc, clickUsdc] = await Promise.all([
+      d1.prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(duration_seconds),0) as totalSeconds FROM view_sessions WHERE ad_id = ? AND ended_at IS NOT NULL").bind(adId).first(),
+      d1.prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(usdc_reward),0) as totalUsdc FROM ad_clicks WHERE ad_id = ?").bind(adId).first(),
+      d1.prepare("SELECT COUNT(DISTINCT user_address) as cnt FROM view_sessions WHERE ad_id = ?").bind(adId).first(),
+      d1.prepare("SELECT COALESCE(SUM(usdc_earned),0) as total FROM view_sessions WHERE ad_id = ? AND ended_at IS NOT NULL").bind(adId).first(),
+      d1.prepare("SELECT COALESCE(SUM(usdc_reward),0) as total FROM ad_clicks WHERE ad_id = ?").bind(adId).first(),
+    ]);
+
+    const totalViews = (views?.cnt as number) ?? 0;
+    const totalViewSeconds = (views?.totalSeconds as number) ?? 0;
+    const totalClicks = (clicks?.cnt as number) ?? 0;
+    const viewSpendUsdc = (viewUsdc?.total as number) ?? 0;
+    const clickSpendUsdc = (clickUsdc?.total as number) ?? 0;
+    const ctr = totalViews > 0 ? (totalClicks / totalViews) * 100 : 0;
+
+    return c.json({
+      adId,
+      uniqueViewers: (uniqueViewers?.cnt as number) ?? 0,
+      views: totalViews,
+      totalViewSeconds,
+      avgViewSeconds: totalViews > 0 ? Math.round(totalViewSeconds / totalViews) : 0,
+      clicks: totalClicks,
+      ctr: Math.round(ctr * 100) / 100,
+      spend: {
+        views: viewSpendUsdc,
+        clicks: clickSpendUsdc,
+        total: viewSpendUsdc + clickSpendUsdc,
+      },
+    });
+  } catch (e) {
+    return c.json({ error: "Failed to fetch analytics", details: String(e) }, 500);
+  }
+});
+
 /// Pause (deactivate) an ad campaign
 adRoutes.post("/:id/pause", async (c) => {
   const { advertiserAddress } = await c.req.json();

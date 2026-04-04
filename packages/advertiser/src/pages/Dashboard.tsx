@@ -43,6 +43,16 @@ interface GatewayStatus {
   balance?: string;
 }
 
+interface CampaignAnalytics {
+  views: number;
+  uniqueViewers: number;
+  totalViewSeconds: number;
+  avgViewSeconds: number;
+  clicks: number;
+  ctr: number;
+  spend: { views: number; clicks: number; total: number };
+}
+
 interface AdvBalance {
   totalDeposited: number;
   totalSpent: number;
@@ -61,6 +71,8 @@ export function Dashboard() {
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus | null>(null);
   const [advBalance, setAdvBalance] = useState<AdvBalance | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [analytics, setAnalytics] = useState<Record<string, CampaignAnalytics>>({});
+  const [expandedAd, setExpandedAd] = useState<string | null>(null);
 
   // Live spend ticker: increment accrued display based on active sessions
   const [liveAccrued, setLiveAccrued] = useState(0);
@@ -173,6 +185,23 @@ export function Dashboard() {
         body: JSON.stringify({ advertiserAddress, amountUsdc, txHash }),
       });
     } catch {}
+  }
+
+  async function loadAnalytics(adId: string) {
+    try {
+      const res = await fetch(`${API_BASE}/ads/${adId}/analytics`);
+      const data = await res.json();
+      setAnalytics((prev) => ({ ...prev, [adId]: data }));
+    } catch {}
+  }
+
+  function toggleExpand(adId: string) {
+    if (expandedAd === adId) {
+      setExpandedAd(null);
+    } else {
+      setExpandedAd(adId);
+      if (!analytics[adId]) loadAnalytics(adId);
+    }
   }
 
   async function toggleAd(adId: string, currentlyActive: boolean) {
@@ -354,10 +383,17 @@ export function Dashboard() {
                     const remaining = camp.budget_allocated_usdc - camp.budget_spent_usdc;
                     const pct = camp.budget_allocated_usdc > 0 ? (camp.budget_spent_usdc / camp.budget_allocated_usdc) * 100 : 0;
                     const isActive = camp.active === 1;
+                    const isExpanded = expandedAd === camp.id;
+                    const stats = analytics[camp.id];
                     return (
                       <div key={camp.id} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: 20, opacity: isActive ? 1 : 0.6 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: c.text }}>{camp.title}</h3>
+                          <h3
+                            onClick={() => toggleExpand(camp.id)}
+                            style={{ margin: 0, fontSize: 16, fontWeight: 600, color: c.text, cursor: "pointer" }}
+                          >
+                            {isExpanded ? "▾" : "▸"} {camp.title}
+                          </h3>
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                             <span style={{
                               fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 100,
@@ -392,6 +428,45 @@ export function Dashboard() {
                             <span>Click: <strong style={{ color: c.green }}>${camp.click_reward_usdc}</strong>/click</span>
                           )}
                         </div>
+
+                        {/* ── Expanded Analytics ──────────────── */}
+                        {isExpanded && (
+                          <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${c.border}` }}>
+                            {!stats ? (
+                              <div style={{ fontSize: 13, color: c.subtle }}>Loading analytics...</div>
+                            ) : (
+                              <>
+                                {/* Metrics row */}
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 16 }}>
+                                  <MetricBox label="Views" value={String(stats.views)} />
+                                  <MetricBox label="Unique Viewers" value={String(stats.uniqueViewers)} />
+                                  <MetricBox label="Avg View" value={`${stats.avgViewSeconds}s`} />
+                                  <MetricBox label="Clicks" value={String(stats.clicks)} />
+                                  <MetricBox label="CTR" value={`${stats.ctr}%`} />
+                                  <MetricBox label="Total Time" value={formatDuration(stats.totalViewSeconds)} />
+                                </div>
+
+                                {/* Spend breakdown */}
+                                <div style={{ fontSize: 13, color: c.text }}>
+                                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Spend Breakdown</div>
+                                  <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+                                    <SpendRow label="View attention" amount={stats.spend.views} color={c.indigo} />
+                                    <SpendRow label="Click-throughs" amount={stats.spend.clicks} color={c.green} />
+                                    <SpendRow label="Total" amount={stats.spend.total} color={c.text} bold />
+                                  </div>
+                                </div>
+
+                                {/* Refresh button */}
+                                <button
+                                  onClick={() => loadAnalytics(camp.id)}
+                                  style={{ ...btnSecondary, fontSize: 11, padding: "4px 10px", marginTop: 12 }}
+                                >
+                                  Refresh
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -420,6 +495,33 @@ function MiniCard({ label, value, accent, pulse, sub }: {
       {pulse && <style>{`@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.3 } }`}</style>}
     </div>
   );
+}
+
+function MetricBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ background: c.bg, borderRadius: 10, padding: "10px 12px", textAlign: "center" }}>
+      <div style={{ fontSize: 18, fontWeight: 800, color: c.text, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      <div style={{ fontSize: 11, color: c.subtle, marginTop: 2 }}>{label}</div>
+    </div>
+  );
+}
+
+function SpendRow({ label, amount, color, bold }: { label: string; amount: number; color: string; bold?: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+      <span style={{ fontSize: 13, color: c.muted }}>{label}:</span>
+      <span style={{ fontSize: 13, fontWeight: bold ? 700 : 600, color }}>${amount.toFixed(4)}</span>
+    </div>
+  );
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h}h ${m}m`;
 }
 
 const inputStyle: React.CSSProperties = {

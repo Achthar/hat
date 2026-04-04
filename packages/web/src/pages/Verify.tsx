@@ -53,6 +53,16 @@ export function Verify() {
       setVerifiedAddress(addr!);
       setStatus("success");
       refreshUser();
+
+      // Notify extension
+      try {
+        window.postMessage({
+          type: "HAT_WORLD_ID_VERIFIED",
+          address: addr,
+          nullifier: `mock-nullifier-${addr}`,
+          verified: true,
+        }, "*");
+      } catch { /* not in extension context */ }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Bypass failed");
       setStatus("error");
