@@ -8,7 +8,10 @@
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean",
-    "zip:extension": "cd packages/extension/dist && zip -r ../../web/public/hat-extension.zip ."
+    "zip:extension": "node scripts/zip-extension.mjs",
+    "deploy:web": "pnpm --filter @hat/web build && wrangler pages deploy packages/web/dist --project-name=hat",
+    "deploy:advertiser": "pnpm --filter @hat/advertiser build && wrangler pages deploy packages/advertiser/dist --project-name=hat-advertiser",
+    "deploy": "pnpm deploy:web && pnpm deploy:advertiser"
   },
   "engines": {
     "node": ">=18",
