@@ -9,50 +9,70 @@ try {
   // not in extension context
 }
 
-function updateUI(data: {
+// ── DOM refs ──────────────────────────────────────────────────
+
+const viewDisconnected = document.getElementById("view-disconnected")!;
+const viewConnected = document.getElementById("view-connected")!;
+const connectBtn = document.getElementById("connect-btn")!;
+const disconnectBtn = document.getElementById("disconnect-btn")!;
+const walletAddr = document.getElementById("wallet-addr")!;
+const hatEarnedEl = document.getElementById("hat-earned")!;
+const usdcEarnedEl = document.getElementById("usdc-earned")!;
+const verifiedEl = document.getElementById("verified-status")!;
+const statusDot = document.getElementById("status-dot")!;
+const verifyBtn = document.getElementById("verify-btn")!;
+const statusEl = document.getElementById("status")!;
+
+// ── State ─────────────────────────────────────────────────────
+
+function showDisconnected() {
+  viewDisconnected.classList.remove("hidden");
+  viewConnected.classList.add("hidden");
+}
+
+function showConnected(data: {
+  userId: string;
+  verified?: boolean;
   hatEarned?: number;
   usdcEarned?: number;
-  verified?: boolean;
-  userId?: string;
 }) {
-  const hatEarnedEl = document.getElementById("hat-earned")!;
-  const usdcEarnedEl = document.getElementById("usdc-earned")!;
-  const verifiedEl = document.getElementById("verified-status")!;
-  const verifyBtn = document.getElementById("verify-btn")!;
-  const connectBtn = document.getElementById("connect-btn")!;
-  const statusEl = document.getElementById("status")!;
+  viewDisconnected.classList.add("hidden");
+  viewConnected.classList.remove("hidden");
 
+  // Wallet address
+  walletAddr.textContent = `${data.userId.slice(0, 6)}...${data.userId.slice(-4)}`;
+
+  // Earnings
   hatEarnedEl.textContent = String(Math.floor(data.hatEarned || 0));
   usdcEarnedEl.textContent = `$${(data.usdcEarned || 0).toFixed(4)}`;
 
-  if (data.userId && data.userId !== "anonymous") {
-    connectBtn.textContent = `${data.userId.slice(0, 6)}...${data.userId.slice(-4)}`;
-    connectBtn.style.background = "#e5e7eb";
-    connectBtn.style.color = "#374151";
-
-    if (data.verified) {
-      verifiedEl.textContent = "Verified Human";
-      verifiedEl.style.color = "#16a34a";
-      verifyBtn.textContent = "Verified";
-      verifyBtn.style.background = "#16a34a";
-      verifyBtn.disabled = true;
-    } else {
-      verifiedEl.textContent = "Not Verified";
-      verifiedEl.style.color = "#dc2626";
-    }
-
+  // Verification status
+  if (data.verified) {
+    verifiedEl.textContent = "Verified Human";
+    verifiedEl.style.color = "#22c55e";
+    statusDot.classList.add("verified");
+    verifyBtn.textContent = "Verified";
+    verifyBtn.style.background = "linear-gradient(135deg, #22c55e, #16a34a)";
+    (verifyBtn as HTMLButtonElement).disabled = true;
     statusEl.textContent = "Earning HAT for your attention";
   } else {
-    statusEl.textContent = "Connect wallet to start earning";
+    verifiedEl.textContent = "Not Verified";
+    verifiedEl.style.color = "#fb7185";
+    statusDot.classList.remove("verified");
+    verifyBtn.textContent = "Verify with World ID";
+    verifyBtn.style.background = "";
+    (verifyBtn as HTMLButtonElement).disabled = false;
+    statusEl.textContent = "Verify to start earning rewards";
   }
 }
+
+// ── Fetch live stats from backend ─────────────────────────────
 
 async function fetchLiveStats(address: string) {
   try {
     const res = await fetch(`${API_BASE}/auth/user/${address}`);
     if (res.ok) {
       const data = await res.json();
-      // Sync backend stats to extension storage
       chrome.storage.local.set({
         verified: data.verified,
         hatEarned: data.totalHatEarned,
@@ -66,42 +86,50 @@ async function fetchLiveStats(address: string) {
   return null;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const verifyBtn = document.getElementById("verify-btn") as HTMLButtonElement;
-  const connectBtn = document.getElementById("connect-btn") as HTMLButtonElement;
+// ── Load state on open ────────────────────────────────────────
 
-  // Load current status from extension storage
+function loadState() {
   chrome.runtime.sendMessage({ type: "GET_STATUS" }, async (data) => {
-    if (data) {
-      updateUI(data);
+    if (!data || !data.userId || data.userId === "anonymous") {
+      showDisconnected();
+      return;
+    }
 
-      // Also fetch live stats from backend if we have an address
-      if (data.userId && data.userId !== "anonymous") {
-        const live = await fetchLiveStats(data.userId);
-        if (live) {
-          updateUI({
-            ...data,
-            verified: live.verified,
-            hatEarned: live.totalHatEarned,
-            usdcEarned: live.totalUsdcEarned,
-          });
-        }
-      }
+    showConnected(data);
+
+    // Refresh from backend for latest earnings
+    const live = await fetchLiveStats(data.userId);
+    if (live) {
+      showConnected({
+        userId: data.userId,
+        verified: live.verified,
+        hatEarned: live.totalHatEarned,
+        usdcEarned: live.totalUsdcEarned,
+      });
     }
   });
+}
 
-  verifyBtn.addEventListener("click", () => {
-    chrome.tabs.create({ url: "http://localhost:3000/verify" });
+// ── Actions ───────────────────────────────────────────────────
+
+connectBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: "http://localhost:3000" });
+});
+
+verifyBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: "http://localhost:3000/verify" });
+});
+
+disconnectBtn.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "DISCONNECT" }, () => {
+    showDisconnected();
   });
+});
 
-  connectBtn.addEventListener("click", () => {
-    chrome.tabs.create({ url: "http://localhost:3000" });
-  });
+// ── Init & auto-refresh ──────────────────────────────────────
 
-  // Auto-refresh every 10 seconds while popup is open
-  setInterval(() => {
-    chrome.runtime.sendMessage({ type: "GET_STATUS" }, (data) => {
-      if (data) updateUI(data);
-    });
-  }, 10_000);
+document.addEventListener("DOMContentLoaded", () => {
+  loadState();
+  // Refresh every 10s while popup is open
+  setInterval(loadState, 10_000);
 });

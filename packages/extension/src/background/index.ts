@@ -32,4 +32,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     });
     sendResponse({ ok: true });
   }
+
+  if (msg.type === "DISCONNECT") {
+    chrome.storage.local.set({
+      userId: "anonymous",
+      verified: false,
+      nullifier: null,
+      hatEarned: 0,
+      usdcEarned: 0,
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
 });
