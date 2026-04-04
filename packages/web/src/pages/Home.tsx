@@ -134,6 +134,19 @@ export function Home() {
               Verify with World ID
             </Link>
           )}
+          <div style={{ marginTop: 16 }}>
+            <Link
+              to="/download"
+              style={{
+                color: c.indigo,
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              Download the Browser Extension &rarr;
+            </Link>
+          </div>
         </section>
 
         {/* ── How It Works ─────────────────────────────────── */}

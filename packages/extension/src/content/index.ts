@@ -13,8 +13,28 @@ try {
 interface Ad {
   id: string;
   image_url: string;
+  image_wide?: string;  // leaderboard format (e.g. 728x90)
+  image_tall?: string;  // skyscraper format (e.g. 160x600)
   target_url: string;
   title: string;
+}
+
+type SlotShape = "standard" | "wide" | "tall";
+
+/** Classify a slot by its aspect ratio */
+function classifySlot(w: number, h: number): SlotShape {
+  if (w <= 0 || h <= 0) return "standard";
+  const ratio = w / h;
+  if (ratio >= 3) return "wide";   // leaderboard-like (728x90 = 8:1, 320x50 = 6.4:1)
+  if (ratio <= 0.6) return "tall"; // skyscraper-like (160x600 = 0.27:1, 300x600 = 0.5:1)
+  return "standard";               // medium rectangle, square, etc.
+}
+
+/** Pick the best image URL for a given slot shape */
+function pickImage(ad: Ad, shape: SlotShape): string {
+  if (shape === "wide" && ad.image_wide) return ad.image_wide;
+  if (shape === "tall" && ad.image_tall) return ad.image_tall;
+  return ad.image_url;
 }
 
 const activeSessions = new Map<string, { sessionId: string; heartbeatTimer: number }>();
@@ -71,6 +91,30 @@ async function endViewSession(sessionId: string) {
         usdc: data.usdcEarned,
       });
       updateEarningsDisplay();
+    }
+  } catch {
+    // silent
+  }
+}
+
+async function reportClick(adId: string, sessionId?: string) {
+  try {
+    const userId = await getUserId();
+    const res = await fetch(`${API_BASE}/views/click`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, adId, sessionId }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.usdcReward > 0) {
+        chrome.runtime.sendMessage({
+          type: "UPDATE_EARNINGS",
+          hat: data.hatReward,
+          usdc: data.usdcReward,
+        });
+        updateEarningsDisplay();
+      }
     }
   } catch {
     // silent
@@ -225,6 +269,7 @@ const CROSSFADE_MS = 600;
 interface SlotState {
   container: HTMLElement;
   adIndex: number;
+  shape: SlotShape;
   size?: { width: string; height: string };
 }
 
@@ -267,11 +312,49 @@ function assignUniqueIndices(slotCount: number, adCount: number, avoid: number[]
   return result;
 }
 
-function buildAdHtml(ad: Ad): string {
+/** Native HTML strip for wide/leaderboard slots — text + logo, no image scaling issues */
+function buildWideAdHtml(ad: Ad): string {
+  // Pick a color accent per ad for variety
+  const accents = ["#818cf8", "#fb7185", "#fbbf24"];
+  const accent = accents[Math.abs(hashStr(ad.id)) % accents.length];
+  return `
+    <a href="${ad.target_url}" target="_blank" rel="noopener"
+      style="display:flex;align-items:center;width:100%;height:100%;padding:0 16px;gap:12px;
+        text-decoration:none;border-radius:10px;overflow:hidden;">
+      <div style="flex-shrink:0;width:28px;height:28px;border-radius:8px;
+        background:linear-gradient(135deg,${accent},rgba(255,255,255,0.06));
+        display:flex;align-items:center;justify-content:center;
+        border:1px solid rgba(255,255,255,0.1);">
+        <span style="font-weight:900;font-size:11px;color:#fff;font-family:system-ui;">H</span>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:system-ui,-apple-system,sans-serif;">
+          ${ad.title}
+        </div>
+      </div>
+      <div style="flex-shrink:0;padding:6px 14px;border-radius:8px;
+        background:linear-gradient(135deg,${accent},rgba(255,255,255,0.05));
+        font-size:11px;font-weight:700;color:#fff;font-family:system-ui;white-space:nowrap;
+        border:1px solid rgba(255,255,255,0.08);">
+        Learn More
+      </div>
+      <div style="flex-shrink:0;font-size:9px;color:rgba(255,255,255,0.3);font-family:system-ui;
+        padding-left:8px;border-left:1px solid rgba(255,255,255,0.06);white-space:nowrap;">
+        HAT Ad
+      </div>
+    </a>
+  `;
+}
+
+function buildAdHtml(ad: Ad, shape: SlotShape = "standard"): string {
+  // Wide slots get a native HTML strip instead of a scaled image
+  if (shape === "wide") return buildWideAdHtml(ad);
+
+  const imgSrc = pickImage(ad, shape);
   return `
     <a href="${ad.target_url}" target="_blank" rel="noopener" style="display:block;width:100%;height:100%;border-radius:12px;overflow:hidden;">
-      <img src="${ad.image_url}" alt="${ad.title}"
-        style="width:100%;height:100%;object-fit:cover;transition:transform .2s,filter .2s;"
+      <img src="${imgSrc}" alt="${ad.title}"
+        style="width:100%;height:100%;object-fit:contain;transition:transform .2s,filter .2s;"
         onmouseenter="this.style.transform='scale(1.02)';this.style.filter='brightness(1.05)'"
         onmouseleave="this.style.transform='none';this.style.filter='none'" />
     </a>
@@ -283,19 +366,36 @@ function buildAdHtml(ad: Ad): string {
   `;
 }
 
-function createHatAd(ad: Ad, matchedSize?: { width: string; height: string }): HTMLElement {
+/** Simple string hash for deterministic color picking */
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+function createHatAd(ad: Ad, shape: SlotShape = "standard", matchedSize?: { width: string; height: string }): HTMLElement {
   const container = document.createElement("div");
   container.className = "hat-replaced-ad";
   container.dataset.adId = ad.id;
   container.style.cssText = `
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     overflow:hidden;border-radius:12px;border:1px solid rgba(99,102,241,0.15);
-    background:rgba(15,11,46,0.04);backdrop-filter:blur(8px);
+    background:rgba(15,11,46,0.96);backdrop-filter:blur(8px);
     box-shadow:0 2px 12px rgba(99,102,241,0.06);position:relative;
     transition:opacity ${CROSSFADE_MS}ms ease;
     ${matchedSize ? `width:${matchedSize.width};height:${matchedSize.height};` : "padding:12px;"}
   `;
-  container.innerHTML = buildAdHtml(ad);
+  container.innerHTML = buildAdHtml(ad, shape);
+
+  // Intercept clicks to report click-through reward
+  container.addEventListener("click", (e) => {
+    const link = (e.target as HTMLElement).closest("a");
+    if (link && link.href) {
+      const session = activeSessions.get(ad.id);
+      reportClick(ad.id, session?.sessionId);
+    }
+  });
+
   return container;
 }
 
@@ -315,7 +415,7 @@ function transitionSlot(slot: SlotState, newAd: Ad) {
   el.style.opacity = "0";
   setTimeout(() => {
     el.dataset.adId = newAd.id;
-    el.innerHTML = buildAdHtml(newAd);
+    el.innerHTML = buildAdHtml(newAd, slot.shape);
     // Fade in
     el.style.opacity = "1";
     // Start new view tracking
@@ -367,11 +467,12 @@ function replaceElement(el: Element) {
   const size = w > 10 && h > 10
     ? { width: `${w}px`, height: `${h}px` }
     : undefined;
+  const shape = classifySlot(w, h);
 
-  const hatAd = createHatAd(ad, size);
+  const hatAd = createHatAd(ad, shape, size);
   replacedElements.add(hatAd);
 
-  const slot: SlotState = { container: hatAd, adIndex, size };
+  const slot: SlotState = { container: hatAd, adIndex, shape, size };
   activeSlots.push(slot);
 
   el.replaceWith(hatAd);

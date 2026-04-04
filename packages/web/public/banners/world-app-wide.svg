@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 728 90">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0f0b2e"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="orb" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <filter id="g"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <rect width="728" height="90" rx="8" fill="url(#bg)"/>
+  <!-- Glow accents -->
+  <circle cx="680" cy="45" r="60" fill="#6366f1" opacity="0.12" filter="url(#g)"/>
+  <circle cx="40" cy="70" r="40" fill="#fb7185" opacity="0.08" filter="url(#g)"/>
+  <!-- Globe icon -->
+  <g transform="translate(50, 45)">
+    <circle r="26" fill="url(#orb)" opacity="0.15"/>
+    <circle r="20" fill="none" stroke="url(#orb)" stroke-width="1.5"/>
+    <ellipse rx="11" ry="20" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.8"/>
+    <line x1="-20" y1="0" x2="20" y2="0" stroke="rgba(255,255,255,0.08)"/>
+    <circle r="5" fill="#6366f1"/>
+    <circle r="2" fill="#fff"/>
+  </g>
+  <!-- Text -->
+  <text x="90" y="38" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="800" fill="white">World App</text>
+  <text x="90" y="58" font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="#a5b4fc" opacity="0.7">Proof of Human Identity</text>
+  <!-- CTA -->
+  <rect x="590" y="25" width="110" height="40" rx="10" fill="url(#orb)"/>
+  <text x="614" y="51" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="white">Get Verified</text>
+  <!-- Badge -->
+  <rect x="310" y="32" width="68" height="24" rx="12" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)"/>
+  <circle cx="324" cy="44" r="3" fill="#22c55e"/>
+  <text x="332" y="48" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600" fill="rgba(255,255,255,0.45)">Trusted</text>
+</svg>

@@ -14,14 +14,14 @@ devRoutes.post("/seed", async (c) => {
   const bannerBase = (c.req.header("origin") || "http://localhost:3000") + "/banners";
 
   const ads = [
-    { id: "demo-ad-1", title: "World App — Proof of Human", imageUrl: `${bannerBase}/world-app.svg`, targetUrl: "https://world.org", budget: 50 },
-    { id: "demo-ad-2", title: "Circle USDC — Digital Dollars", imageUrl: `${bannerBase}/circle-usdc.svg`, targetUrl: "https://circle.com", budget: 30 },
-    { id: "demo-ad-3", title: "HAT — Earn While You Browse", imageUrl: `${bannerBase}/hat-token.svg`, targetUrl: "http://localhost:3000", budget: 20 },
+    { id: "demo-ad-1", title: "World App — Proof of Human", imageUrl: `${bannerBase}/world-app.svg`, imageWide: `${bannerBase}/world-app-wide.svg`, imageTall: `${bannerBase}/world-app-tall.svg`, targetUrl: "https://world.org", budget: 50 },
+    { id: "demo-ad-2", title: "Circle USDC — Digital Dollars", imageUrl: `${bannerBase}/circle-usdc.svg`, imageWide: `${bannerBase}/circle-usdc-wide.svg`, imageTall: `${bannerBase}/circle-usdc-tall.svg`, targetUrl: "https://circle.com", budget: 30 },
+    { id: "demo-ad-3", title: "HAT — Earn While You Browse", imageUrl: `${bannerBase}/hat-token.svg`, imageWide: `${bannerBase}/hat-token-wide.svg`, imageTall: `${bannerBase}/hat-token-tall.svg`, targetUrl: "http://localhost:3000", budget: 20 },
   ];
 
   for (const ad of ads) {
     try {
-      await db.insertAd(d1, ad.id, advAddr, ad.imageUrl, ad.targetUrl, ad.title, ad.budget);
+      await db.insertAd(d1, ad.id, advAddr, ad.imageUrl, ad.targetUrl, ad.title, ad.budget, ad.imageWide, ad.imageTall);
     } catch {
       // already exists
     }

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 600">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f0b2e"/>
+      <stop offset="50%" stop-color="#1a0f3c"/>
+      <stop offset="100%" stop-color="#0f0b2e"/>
+    </linearGradient>
+    <linearGradient id="ind" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <filter id="g3"><feGaussianBlur stdDeviation="18"/></filter>
+  </defs>
+  <rect width="160" height="600" rx="8" fill="url(#bg3)"/>
+  <circle cx="80" cy="60" r="60" fill="#6366f1" opacity="0.1" filter="url(#g3)"/>
+  <circle cx="120" cy="400" r="50" fill="#fbbf24" opacity="0.06" filter="url(#g3)"/>
+  <circle cx="30" cy="520" r="40" fill="#fb7185" opacity="0.05" filter="url(#g3)"/>
+
+  <!-- HAT Logo -->
+  <g transform="translate(80, 120)">
+    <circle r="52" fill="url(#ind)" opacity="0.08"/>
+    <circle r="42" fill="rgba(15,11,46,0.6)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <!-- H rose -->
+    <g fill="#fb7185" opacity="0.7"><rect x="-18" y="-16" width="5" height="32" rx="1.5"/><rect x="-18" y="-2" width="36" height="5" rx="1.5"/><rect x="13" y="-16" width="5" height="32" rx="1.5"/></g>
+    <!-- T amber -->
+    <g fill="#fbbf24" opacity="0.7"><rect x="-18" y="-16" width="36" height="5" rx="1.5"/><rect x="-2.5" y="-16" width="5" height="32" rx="1.5"/></g>
+    <!-- A white -->
+    <g fill="white" opacity="0.95"><rect x="-18" y="-16" width="5" height="32" rx="1.5"/><rect x="13" y="-16" width="5" height="32" rx="1.5"/><rect x="-18" y="-16" width="36" height="5" rx="1.5"/><rect x="-18" y="-2" width="36" height="5" rx="1.5"/></g>
+    <!-- Particles -->
+    <circle cx="42" cy="0" r="2.5" fill="#fbbf24" opacity="0.4"/>
+    <circle cx="-32" cy="30" r="2" fill="#fb7185" opacity="0.3"/>
+    <circle cx="25" cy="-38" r="1.5" fill="#818cf8" opacity="0.3"/>
+  </g>
+
+  <!-- Text -->
+  <text x="80" y="206" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" letter-spacing="2" fill="#fbbf24" opacity="0.6">EARN</text>
+  <text x="80" y="234" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="26" font-weight="800" fill="white">HAT</text>
+  <text x="80" y="260" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="800" fill="white">Token</text>
+  <text x="80" y="290" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="#c7d2fe" opacity="0.6">Your attention</text>
+  <text x="80" y="306" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="#c7d2fe" opacity="0.6">has value.</text>
+
+  <!-- Metric pills -->
+  <rect x="20" y="340" width="120" height="32" rx="10" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)"/>
+  <circle cx="36" cy="356" r="4" fill="#fbbf24"/>
+  <text x="46" y="361" font-family="system-ui" font-size="11" font-weight="600" fill="rgba(255,255,255,0.5)">USDC + HAT</text>
+
+  <rect x="20" y="382" width="120" height="32" rx="10" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)"/>
+  <circle cx="36" cy="398" r="4" fill="#22c55e"/>
+  <text x="46" y="403" font-family="system-ui" font-size="11" font-weight="600" fill="rgba(255,255,255,0.5)">Humans Only</text>
+
+  <rect x="20" y="424" width="120" height="32" rx="10" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)"/>
+  <circle cx="36" cy="440" r="4" fill="#6366f1"/>
+  <text x="46" y="445" font-family="system-ui" font-size="11" font-weight="600" fill="rgba(255,255,255,0.5)">Gas-Free</text>
+
+  <!-- CTA -->
+  <rect x="20" y="486" width="120" height="44" rx="12" fill="url(#ind)"/>
+  <text x="80" y="514" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="700" fill="white">Start Earning</text>
+
+  <text x="80" y="570" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="rgba(255,255,255,0.2)">hat.app</text>
+</svg>

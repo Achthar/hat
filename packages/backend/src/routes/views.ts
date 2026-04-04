@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { RATE_PER_SECOND_USDC, HAT_PER_USDC } from "@hat/common";
+// RATE_PER_SECOND_USDC is the global fallback; ads can override with view_reward_per_second
 import type { Env } from "../types.js";
 import * as db from "../db.js";
 
@@ -35,7 +36,11 @@ viewRoutes.post("/end", async (c) => {
 
     const endedAt = Date.now();
     const durationSeconds = Math.floor((endedAt - (session.started_at as number)) / 1000);
-    const usdcEarned = durationSeconds * RATE_PER_SECOND_USDC;
+
+    // Use the ad's custom rate if set, otherwise fall back to global default
+    const ad = await db.getAd(c.env.DB, session.ad_id as string);
+    const ratePerSecond = (ad?.view_reward_per_second as number) || RATE_PER_SECOND_USDC;
+    const usdcEarned = durationSeconds * ratePerSecond;
     const hatEarned = usdcEarned * HAT_PER_USDC;
 
     await db.endSession(c.env.DB, sessionId, endedAt, durationSeconds, usdcEarned, hatEarned);
@@ -51,6 +56,34 @@ viewRoutes.post("/end", async (c) => {
   } catch (e) {
     console.error("views/end error:", e);
     return c.json({ error: "Failed to end session", details: String(e) }, 500);
+  }
+});
+
+/// Record a click-through on an ad (viewer clicked the banner)
+viewRoutes.post("/click", async (c) => {
+  try {
+    const { userId, adId, sessionId } = await c.req.json();
+    if (!userId || !adId) return c.json({ error: "userId and adId required" }, 400);
+
+    const ad = await db.getAd(c.env.DB, adId);
+    if (!ad) return c.json({ error: "Ad not found" }, 404);
+
+    const clickReward = (ad.click_reward_usdc as number) || 0;
+    const hatReward = clickReward * HAT_PER_USDC;
+    const clickId = `click-${userId}-${adId}-${Date.now()}`;
+
+    await db.insertClick(c.env.DB, clickId, userId, adId, sessionId ?? null, clickReward, hatReward);
+
+    return c.json({
+      clickId,
+      adId,
+      usdcReward: clickReward,
+      hatReward,
+      targetUrl: ad.target_url,
+    });
+  } catch (e) {
+    console.error("views/click error:", e);
+    return c.json({ error: "Failed to record click", details: String(e) }, 500);
   }
 });
 

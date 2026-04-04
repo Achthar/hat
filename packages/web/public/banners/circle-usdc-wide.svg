@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 728 90">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0c1e3a"/>
+      <stop offset="100%" stop-color="#0a1628"/>
+    </linearGradient>
+    <linearGradient id="bl" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <filter id="g2"><feGaussianBlur stdDeviation="14"/></filter>
+  </defs>
+  <rect width="728" height="90" rx="8" fill="url(#bg2)"/>
+  <circle cx="660" cy="45" r="50" fill="#2563eb" opacity="0.1" filter="url(#g2)"/>
+  <!-- USDC coin -->
+  <g transform="translate(50, 45)">
+    <circle r="26" fill="rgba(37,99,235,0.12)"/>
+    <circle r="20" fill="none" stroke="url(#bl)" stroke-width="1.5"/>
+    <text y="6" text-anchor="middle" font-family="system-ui" font-size="20" font-weight="800" fill="url(#bl)">$</text>
+  </g>
+  <!-- Text -->
+  <text x="90" y="38" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="800" fill="white">USDC on Arc</text>
+  <text x="90" y="58" font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="#93c5fd" opacity="0.7">Digital dollars. Instant settlement.</text>
+  <!-- Stats -->
+  <text x="340" y="42" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="800" fill="white">$44B+</text>
+  <text x="408" y="42" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="rgba(255,255,255,0.35)">circulation</text>
+  <text x="340" y="62" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="800" fill="white">0.01s</text>
+  <text x="394" y="62" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="rgba(255,255,255,0.35)">on Arc</text>
+  <!-- CTA -->
+  <rect x="590" y="25" width="110" height="40" rx="10" fill="url(#bl)"/>
+  <text x="610" y="51" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="white">Learn More</text>
+</svg>
