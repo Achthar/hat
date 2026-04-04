@@ -104,7 +104,13 @@ export function Dashboard() {
   function loadAll(addr: string) {
     fetch(`${API_BASE}/ads/by-advertiser/${addr}`)
       .then((r) => r.json())
-      .then((data) => setCampaigns(data.ads))
+      .then((data) => {
+        setCampaigns(data.ads);
+        // Auto-load analytics for all campaigns
+        for (const ad of data.ads) {
+          loadAnalytics(ad.id);
+        }
+      })
       .catch(() => {});
     loadBalance(addr);
     loadGatewayStatus();
@@ -402,13 +408,9 @@ export function Dashboard() {
                     const stats = analytics[camp.id];
                     return (
                       <div key={camp.id} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: 20, opacity: isActive ? 1 : 0.6 }}>
+                        {/* ── Header ──────────────────────────── */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                          <h3
-                            onClick={() => toggleExpand(camp.id)}
-                            style={{ margin: 0, fontSize: 16, fontWeight: 600, color: c.text, cursor: "pointer" }}
-                          >
-                            {isExpanded ? "▾" : "▸"} {camp.title}
-                          </h3>
+                          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: c.text }}>{camp.title}</h3>
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                             <span style={{
                               fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 100,
@@ -431,10 +433,26 @@ export function Dashboard() {
                             </button>
                           </div>
                         </div>
+
+                        {/* ── Budget bar ──────────────────────── */}
                         <div style={{ height: 6, background: c.indigoBg, borderRadius: 100, marginBottom: 12, overflow: "hidden" }}>
                           <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: `linear-gradient(90deg, ${c.indigo}, ${c.amber})`, borderRadius: 100, transition: "width .3s" }} />
                         </div>
-                        <div style={{ display: "flex", gap: 16, fontSize: 13, color: c.muted, flexWrap: "wrap" }}>
+
+                        {/* ── Inline metrics (always visible) ─── */}
+                        {stats && (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 8, marginBottom: 12 }}>
+                            <MetricBox label="Views" value={String(stats.views)} />
+                            <MetricBox label="Viewers" value={String(stats.uniqueViewers)} />
+                            <MetricBox label="Clicks" value={String(stats.clicks)} />
+                            <MetricBox label="CTR" value={`${stats.ctr}%`} />
+                            <MetricBox label="Avg View" value={`${stats.avgViewSeconds}s`} />
+                            <MetricBox label="Total Time" value={formatDuration(stats.totalViewSeconds)} />
+                          </div>
+                        )}
+
+                        {/* ── Budget + rates row ─────────────── */}
+                        <div style={{ display: "flex", gap: 16, fontSize: 13, color: c.muted, flexWrap: "wrap", marginBottom: 8 }}>
                           <span>Budget: <strong style={{ color: c.text }}>${camp.budget_allocated_usdc}</strong></span>
                           <span>Spent: <strong style={{ color: c.amber }}>${camp.budget_spent_usdc.toFixed(4)}</strong></span>
                           <span>Remaining: <strong style={{ color: c.indigo }}>${remaining.toFixed(4)}</strong></span>
@@ -444,42 +462,36 @@ export function Dashboard() {
                           )}
                         </div>
 
-                        {/* ── Expanded Analytics ──────────────── */}
-                        {isExpanded && (
-                          <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${c.border}` }}>
-                            {!stats ? (
-                              <div style={{ fontSize: 13, color: c.subtle }}>Loading analytics...</div>
-                            ) : (
-                              <>
-                                {/* Metrics row */}
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 16 }}>
-                                  <MetricBox label="Views" value={String(stats.views)} />
-                                  <MetricBox label="Unique Viewers" value={String(stats.uniqueViewers)} />
-                                  <MetricBox label="Avg View" value={`${stats.avgViewSeconds}s`} />
-                                  <MetricBox label="Clicks" value={String(stats.clicks)} />
-                                  <MetricBox label="CTR" value={`${stats.ctr}%`} />
-                                  <MetricBox label="Total Time" value={formatDuration(stats.totalViewSeconds)} />
-                                </div>
+                        {/* ── Spend breakdown (always visible) ── */}
+                        {stats && (
+                          <div style={{ display: "flex", gap: 20, fontSize: 12, flexWrap: "wrap", alignItems: "center" }}>
+                            <SpendRow label="Views" amount={stats.spend.views} color={c.indigo} />
+                            <SpendRow label="Clicks" amount={stats.spend.clicks} color={c.green} />
+                            <SpendRow label="Total" amount={stats.spend.total} color={c.text} bold />
+                            <button
+                              onClick={() => toggleExpand(camp.id)}
+                              style={{ ...btnSecondary, fontSize: 11, padding: "2px 8px", marginLeft: "auto" }}
+                            >
+                              {isExpanded ? "Less" : "More"}
+                            </button>
+                          </div>
+                        )}
 
-                                {/* Spend breakdown */}
-                                <div style={{ fontSize: 13, color: c.text }}>
-                                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Spend Breakdown</div>
-                                  <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-                                    <SpendRow label="View attention" amount={stats.spend.views} color={c.indigo} />
-                                    <SpendRow label="Click-throughs" amount={stats.spend.clicks} color={c.green} />
-                                    <SpendRow label="Total" amount={stats.spend.total} color={c.text} bold />
-                                  </div>
-                                </div>
-
-                                {/* Refresh button */}
-                                <button
-                                  onClick={() => loadAnalytics(camp.id)}
-                                  style={{ ...btnSecondary, fontSize: 11, padding: "4px 10px", marginTop: 12 }}
-                                >
-                                  Refresh
-                                </button>
-                              </>
-                            )}
+                        {/* ── Expanded detail ────────────────── */}
+                        {isExpanded && stats && (
+                          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${c.border}`, fontSize: 13, color: c.muted }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                              <div>Cost per view: <strong style={{ color: c.text }}>${stats.views > 0 ? (stats.spend.views / stats.views).toFixed(6) : "—"}</strong></div>
+                              <div>Cost per click: <strong style={{ color: c.text }}>${stats.clicks > 0 ? (stats.spend.clicks / stats.clicks).toFixed(4) : "—"}</strong></div>
+                              <div>Cost per unique viewer: <strong style={{ color: c.text }}>${stats.uniqueViewers > 0 ? (stats.spend.total / stats.uniqueViewers).toFixed(4) : "—"}</strong></div>
+                              <div>Cost per second: <strong style={{ color: c.text }}>${stats.totalViewSeconds > 0 ? (stats.spend.views / stats.totalViewSeconds).toFixed(6) : "—"}</strong></div>
+                            </div>
+                            <button
+                              onClick={() => loadAnalytics(camp.id)}
+                              style={{ ...btnSecondary, fontSize: 11, padding: "4px 10px", marginTop: 10 }}
+                            >
+                              Refresh Analytics
+                            </button>
                           </div>
                         )}
                       </div>
