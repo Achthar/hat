@@ -1,25 +1,25 @@
 import { Hono } from "hono";
-import { ethers } from "ethers";
-import { PAYOUT_VAULT_ABI, HAT_TOKEN_ABI } from "@hat/common";
+import { runSettlement } from "../services/settlement.js";
+import { stmts } from "../db.js";
 
 export const settlementRoutes = new Hono();
 
 /// Trigger batch settlement — distributes USDC + mints HAT for all unsettled sessions
 settlementRoutes.post("/batch", async (c) => {
-  // TODO: Aggregate unsettled view sessions from DB
-  // TODO: Group by advertiser for USDC distribution
-  // TODO: Call PayoutVault.distribute() for each advertiser
-  // TODO: Call HATToken.batchMint() for all viewers
-  // TODO: Mark sessions as settled
-
-  return c.json({
-    message: "Settlement batch triggered",
-    // txHashes: { vault: "0x...", hat: "0x..." }
-  });
+  try {
+    const result = await runSettlement();
+    if (result.recipientCount === 0) {
+      return c.json({ message: "No unsettled sessions to process" });
+    }
+    return c.json(result);
+  } catch (e) {
+    console.error("Settlement failed:", e);
+    return c.json({ error: "Settlement failed", details: String(e) }, 500);
+  }
 });
 
 /// Get settlement history
 settlementRoutes.get("/history", async (c) => {
-  // TODO: Return past settlement batches
-  return c.json({ batches: [] });
+  const batches = stmts.getSettlements.all();
+  return c.json({ batches });
 });

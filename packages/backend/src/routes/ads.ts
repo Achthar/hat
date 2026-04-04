@@ -1,36 +1,43 @@
 import { Hono } from "hono";
-import type { AdBanner } from "@hat/common";
+import { stmts } from "../db.js";
 
 export const adRoutes = new Hono();
 
-// In-memory store for hackathon MVP
-const ads: AdBanner[] = [];
-
 /// Get active ads to display in extension
 adRoutes.get("/active", async (c) => {
-  const active = ads.filter((a) => a.active && a.budgetSpentUsdc < a.budgetAllocatedUsdc);
-  return c.json({ ads: active });
+  const ads = stmts.getActiveAds.all();
+  return c.json({ ads });
 });
 
 /// Create a new ad (advertiser)
 adRoutes.post("/create", async (c) => {
   const body = await c.req.json();
-  const ad: AdBanner = {
-    id: crypto.randomUUID(),
+  const id = crypto.randomUUID();
+
+  stmts.insertAd.run(
+    id,
+    body.advertiserId,
+    body.imageUrl,
+    body.targetUrl,
+    body.title,
+    body.budgetUsdc ?? 0
+  );
+
+  return c.json({
+    id,
     advertiserId: body.advertiserId,
     imageUrl: body.imageUrl,
     targetUrl: body.targetUrl,
     title: body.title,
-    budgetAllocatedUsdc: body.budgetUsdc,
+    budgetAllocatedUsdc: body.budgetUsdc ?? 0,
     budgetSpentUsdc: 0,
     active: true,
-  };
-  ads.push(ad);
-  return c.json(ad, 201);
+  }, 201);
 });
 
 /// Get ads by advertiser
-adRoutes.get("/by-advertiser/:id", async (c) => {
-  const id = c.req.param("id");
-  return c.json({ ads: ads.filter((a) => a.advertiserId === id) });
+adRoutes.get("/by-advertiser/:address", async (c) => {
+  const address = c.req.param("address");
+  const ads = stmts.getAdsByAdvertiser.all(address);
+  return c.json({ ads });
 });

@@ -1,15 +1,16 @@
 import { Hono } from "hono";
 import { WORLD_ID_VERIFY_URL } from "@hat/common";
+import { stmts } from "../db.js";
 
 export const authRoutes = new Hono();
 
-const RP_ID = process.env.WORLD_ID_RP_ID!;
-const SIGNING_KEY = process.env.WORLD_ID_SIGNING_KEY!;
+const RP_ID = process.env.WORLD_ID_RP_ID || "";
 
 /// Verify World ID v4 proof and register user
 authRoutes.post("/verify-world-id", async (c) => {
-  const body = await c.req.json();
-  const { proof, address } = body;
+  const { proof, address } = await c.req.json();
+
+  if (!address) return c.json({ error: "address required" }, 400);
 
   // Forward proof to World ID v4 verify endpoint
   const res = await fetch(`${WORLD_ID_VERIFY_URL}/${RP_ID}`, {
@@ -26,19 +27,45 @@ authRoutes.post("/verify-world-id", async (c) => {
   const result = await res.json();
   const nullifier = result.nullifier_hash;
 
-  // TODO: Store nullifier <-> address mapping in DB
-  // TODO: Check nullifier uniqueness (one human = one account)
+  // Check nullifier uniqueness
+  const existing = stmts.getUserByNullifier.get(nullifier);
+  if (existing) {
+    return c.json({ error: "This World ID has already been linked to an account" }, 409);
+  }
 
-  return c.json({
-    verified: true,
-    nullifier,
-    address,
-  });
+  // Upsert user and mark verified
+  stmts.upsertUser.run(address);
+  stmts.verifyUser.run(nullifier, address);
+
+  return c.json({ verified: true, nullifier, address });
 });
 
 /// Connect wallet (non-World-ID flow, limited features)
 authRoutes.post("/connect-wallet", async (c) => {
   const { address } = await c.req.json();
-  // TODO: Verify signature to prove wallet ownership
-  return c.json({ address, verified: false });
+  if (!address) return c.json({ error: "address required" }, 400);
+
+  stmts.upsertUser.run(address);
+  const user = stmts.getUser.get(address) as Record<string, unknown>;
+
+  return c.json({
+    address,
+    verified: !!user?.verified,
+    totalHatEarned: user?.total_hat_earned ?? 0,
+    totalUsdcEarned: user?.total_usdc_earned ?? 0,
+  });
+});
+
+/// Get user profile
+authRoutes.get("/user/:address", async (c) => {
+  const address = c.req.param("address");
+  const user = stmts.getUser.get(address) as Record<string, unknown> | undefined;
+  if (!user) return c.json({ error: "User not found" }, 404);
+
+  return c.json({
+    address: user.address,
+    verified: !!user.verified,
+    totalHatEarned: user.total_hat_earned,
+    totalUsdcEarned: user.total_usdc_earned,
+  });
 });
