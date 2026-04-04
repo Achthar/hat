@@ -1,4 +1,13 @@
-const API_BASE = "http://localhost:3001/api";
+let API_BASE = "https://hat-backend.achim-d87.workers.dev/api";
+
+// Allow override via extension storage
+try {
+  chrome.storage.local.get("apiBase", (data) => {
+    if (data.apiBase) API_BASE = data.apiBase;
+  });
+} catch {
+  // not in extension context
+}
 
 function updateUI(data: {
   hatEarned?: number;

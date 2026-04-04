@@ -4,7 +4,9 @@ import type { ISuccessResult } from "@worldcoin/idkit";
 import { WORLD_ID_ACTION } from "@hat/common";
 import { useWallet } from "../hooks/useWallet.js";
 
-const API_BASE = "http://localhost:3001/api";
+import { DEFAULT_API_URL } from "@hat/common";
+
+const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 const APP_ID = (import.meta.env.VITE_WORLD_ID_APP_ID || "app_staging_0000") as `app_${string}`;
 
 export function Verify() {

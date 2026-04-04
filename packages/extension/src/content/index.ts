@@ -1,5 +1,14 @@
-const API_BASE = "http://localhost:3001/api";
+let API_BASE = "https://hat-backend.achim-d87.workers.dev/api";
 const HEARTBEAT_INTERVAL = 15_000; // 15 seconds
+
+// Allow override via extension storage (set in background/options)
+try {
+  chrome.storage.local.get("apiBase", (data) => {
+    if (data.apiBase) API_BASE = data.apiBase;
+  });
+} catch {
+  // not in extension context
+}
 
 interface Ad {
   id: string;
@@ -147,9 +156,10 @@ function createSidebar(ads: Ad[]) {
   sidebar.querySelectorAll(".hat-ad-slot").forEach((slot) => observer.observe(slot));
 }
 
-// Replace existing ad iframes/divs with HAT ads
+// Replace existing ad iframes/divs AND demo placeholders with HAT ads
 function replaceExistingAds(ads: Ad[]) {
   const adSelectors = [
+    "#hat-demo-ad",
     'iframe[src*="doubleclick"]',
     'iframe[src*="googlesyndication"]',
     'div[id*="google_ads"]',
@@ -159,20 +169,19 @@ function replaceExistingAds(ads: Ad[]) {
   let adIndex = 0;
   adSelectors.forEach((selector) => {
     document.querySelectorAll(selector).forEach((el) => {
-      if (adIndex < ads.length) {
-        const ad = ads[adIndex % ads.length];
-        const replacement = document.createElement("div");
-        replacement.className = "hat-ad-slot";
-        replacement.dataset.adId = ad.id;
-        replacement.innerHTML = `
-          <a href="${ad.target_url}" target="_blank">
-            <img src="${ad.image_url}" alt="${ad.title}" style="width:100%;border-radius:8px;" />
-          </a>
-          <div style="font-size:11px;color:#9ca3af;margin-top:4px;">HAT Ad · ${ad.title}</div>
-        `;
-        el.replaceWith(replacement);
-        adIndex++;
-      }
+      const ad = ads[adIndex % ads.length];
+      const replacement = document.createElement("div");
+      replacement.className = "hat-ad-slot";
+      replacement.dataset.adId = ad.id;
+      replacement.style.cssText = "padding:12px;border:1px solid #e5e7eb;border-radius:12px;";
+      replacement.innerHTML = `
+        <a href="${ad.target_url}" target="_blank">
+          <img src="${ad.image_url}" alt="${ad.title}" style="width:100%;border-radius:8px;" />
+        </a>
+        <div style="font-size:11px;color:#9ca3af;margin-top:4px;">HAT Ad · ${ad.title}</div>
+      `;
+      el.replaceWith(replacement);
+      adIndex++;
     });
   });
 }

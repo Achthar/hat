@@ -10,7 +10,9 @@ declare global {
   }
 }
 
-const API_BASE = "http://localhost:3001/api";
+import { DEFAULT_API_URL } from "@hat/common";
+
+const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 
 interface UserState {
   address: string | null;

@@ -3,7 +3,9 @@ import { ethers } from "ethers";
 import { PAYOUT_VAULT_ABI, CONTRACTS, ARC_TESTNET_CHAIN_ID } from "@hat/common";
 import { useWallet } from "../hooks/useWallet.js";
 
-const API_BASE = "http://localhost:3001/api";
+import { DEFAULT_API_URL } from "@hat/common";
+
+const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 
 const USDC_ABI = [
   "function approve(address spender, uint256 amount) external returns (bool)",
