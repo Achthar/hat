@@ -1,3 +1,16 @@
 {
-    "name": "Human Attention Token"
+  "name": "hat-monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "description": "HAT - Human Attention Token: Verified human attention marketplace on Arc",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "lint": "pnpm -r lint",
+    "clean": "pnpm -r clean"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=9"
+  }
 }
