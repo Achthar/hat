@@ -149,46 +149,70 @@ export function Dashboard() {
   }
 
   async function switchToArc() {
-    if (!window.ethereum) return;
+    if (!window.ethereum) throw new Error("No wallet found");
+    const chainId = `0x${ARC_TESTNET_CHAIN_ID.toString(16)}`;
     try {
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
-        params: [{ chainId: `0x${ARC_TESTNET_CHAIN_ID.toString(16)}` }],
+        params: [{ chainId }],
       });
-    } catch {
-      await window.ethereum.request({
-        method: "wallet_addEthereumChain",
-        params: [{
-          chainId: `0x${ARC_TESTNET_CHAIN_ID.toString(16)}`,
-          chainName: "Arc Testnet",
-          rpcUrls: ["https://rpc.testnet.arc.network"],
-          nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
-        }],
-      });
+    } catch (switchError: unknown) {
+      // Chain not added yet — try adding it
+      const err = switchError as { code?: number };
+      if (err.code === 4902 || err.code === -32603) {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId,
+            chainName: "Arc Testnet",
+            rpcUrls: ["https://rpc.testnet.arc.network"],
+            nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
+          }],
+        });
+      } else {
+        throw switchError; // user rejected or unknown error
+      }
     }
   }
 
   async function fundGatewayWallet(amount: number) {
     if (!window.ethereum || !address) { setDepositStatus("Connect wallet first"); return; }
-    const target = gatewayStatus?.gatewayWallet || gatewayStatus?.platformAddress;
+
+    // Fetch gateway status if not loaded yet
+    let target = gatewayStatus?.gatewayWallet || gatewayStatus?.platformAddress;
+    if (!target) {
+      try {
+        const res = await fetch(`${API_BASE}/nanopayments/status`);
+        const status = await res.json();
+        setGatewayStatus(status);
+        target = status.gatewayWallet || status.platformAddress;
+      } catch {}
+    }
     if (!target) {
       setDepositStatus("Gateway not configured — deposit simulated for demo");
       await recordDeposit(address, amount, null);
       return;
     }
-    setDepositStatus("Switching to Arc Testnet...");
-    await switchToArc();
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-    setDepositStatus("Depositing USDC to Gateway...");
+
     try {
+      setDepositStatus("Switching to Arc Testnet...");
+      await switchToArc();
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      setDepositStatus("Confirm the deposit transaction in your wallet...");
       const tx = await signer.sendTransaction({ to: target, value: ethers.parseEther(String(amount)) });
+      setDepositStatus("Transaction submitted, waiting for confirmation...");
       const receipt = await tx.wait();
       await recordDeposit(address, amount, receipt?.hash ?? null);
       setDepositStatus("Deposit complete!");
       loadAll(address);
     } catch (e) {
-      setDepositStatus(`Deposit failed: ${e instanceof Error ? e.message : String(e)}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("user rejected") || msg.includes("denied")) {
+        setDepositStatus("Transaction cancelled by user");
+      } else {
+        setDepositStatus(`Deposit failed: ${msg}`);
+      }
     }
   }
 
