@@ -40,6 +40,7 @@ function pickImage(ad: Ad, shape: SlotShape): string {
 const activeSessions = new Map<string, { sessionId: string; heartbeatTimer: number }>();
 const replacedElements = new WeakSet<Element>();
 let cachedAds: Ad[] = [];
+let sidebarCollapsed = false;
 
 // ── API helpers ──────────────────────────────────────────────
 
@@ -614,9 +615,54 @@ function rotateSidebarSlots() {
   });
 }
 
+function toggleSidebar() {
+  const sidebar = document.getElementById("hat-sidebar");
+  if (!sidebar) return;
+
+  sidebarCollapsed = !sidebarCollapsed;
+  sidebar.classList.toggle("hat-collapsed", sidebarCollapsed);
+  document.body.classList.toggle("hat-active", !sidebarCollapsed);
+  document.body.classList.toggle("hat-collapsed-active", sidebarCollapsed);
+
+  const toggle = sidebar.querySelector(".hat-toggle") as HTMLElement;
+  if (toggle) toggle.textContent = sidebarCollapsed ? "◀" : "▶";
+
+  // Pause/resume sidebar ad sessions when collapsing/expanding
+  if (sidebarCollapsed) {
+    sidebarSlots.forEach((slot) => {
+      const adId = slot.el.dataset.adId!;
+      if (activeSessions.has(adId)) {
+        const session = activeSessions.get(adId)!;
+        clearInterval(session.heartbeatTimer);
+        endViewSession(session.sessionId);
+        activeSessions.delete(adId);
+      }
+    });
+  } else {
+    sidebarSlots.forEach((s) => {
+      viewObserver.unobserve(s.el);
+      viewObserver.observe(s.el);
+    });
+  }
+
+  chrome.storage.local.set({ sidebarCollapsed });
+}
+
 function createSidebar(ads: Ad[]) {
   const sidebar = document.createElement("div");
   sidebar.id = "hat-sidebar";
+
+  // Restore collapse state
+  chrome.storage.local.get("sidebarCollapsed", (data) => {
+    if (data.sidebarCollapsed) {
+      sidebarCollapsed = true;
+      sidebar.classList.add("hat-collapsed");
+      document.body.classList.remove("hat-active");
+      document.body.classList.add("hat-collapsed-active");
+      const toggle = sidebar.querySelector(".hat-toggle") as HTMLElement;
+      if (toggle) toggle.textContent = "◀";
+    }
+  });
 
   // Show up to 3 unique sidebar slots (or fewer if not enough ads)
   const slotCount = Math.min(3, ads.length);
@@ -626,10 +672,14 @@ function createSidebar(ads: Ad[]) {
     <div class="hat-header">
       <span>HAT</span>
       <span id="hat-session-earnings" style="font-size:12px;font-weight:600;color:#fbbf24;">$0.00 USDC · 0 HAT</span>
+      <button class="hat-toggle" title="Toggle sidebar">▶</button>
     </div>
-    <div class="hat-earnings">Earning USDC nanopayments + HAT bonus</div>
+    <div class="hat-sidebar-body">
+      <div class="hat-earnings">Earning USDC nanopayments + HAT bonus</div>
+    </div>
   `;
 
+  const body = sidebar.querySelector(".hat-sidebar-body")!;
   for (let i = 0; i < slotCount; i++) {
     const ad = ads[indices[i]];
     const slotEl = document.createElement("div");
@@ -637,9 +687,11 @@ function createSidebar(ads: Ad[]) {
     slotEl.dataset.adId = ad.id;
     slotEl.style.cssText = `transition: opacity ${CROSSFADE_MS}ms ease, transform ${CROSSFADE_MS}ms ease;`;
     slotEl.innerHTML = buildSidebarSlotHtml(ad);
-    sidebar.appendChild(slotEl);
+    body.appendChild(slotEl);
     sidebarSlots.push({ el: slotEl, adIndex: indices[i] });
   }
+
+  sidebar.querySelector(".hat-toggle")!.addEventListener("click", toggleSidebar);
 
   document.body.appendChild(sidebar);
   document.body.classList.add("hat-active");
@@ -676,9 +728,9 @@ async function activate() {
 
   createSidebar(cachedAds);
 
-  // Sync earnings from backend so counter doesn't reset on reload
+  // Sync earnings from backend frequently
   syncEarningsFromBackend();
-  setInterval(syncEarningsFromBackend, 30_000);
+  setInterval(syncEarningsFromBackend, 5_000);
 
   // Initial scan
   scanAndReplace();

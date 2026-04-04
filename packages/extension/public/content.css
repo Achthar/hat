@@ -15,6 +15,28 @@
   font-family: system-ui, -apple-system, sans-serif;
   color: #e0e7ff;
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.25);
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+/* ── Collapsed state ───────────────────────────────────────── */
+
+#hat-sidebar.hat-collapsed {
+  width: 300px;
+  height: auto;
+  top: 8px;
+  right: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+#hat-sidebar.hat-collapsed .hat-sidebar-body {
+  display: none;
+}
+
+body.hat-collapsed-active {
+  margin-right: 0 !important;
 }
 
 /* Scrollbar */
@@ -49,6 +71,29 @@
   background: linear-gradient(135deg, #fff 30%, #c7d2fe);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+#hat-sidebar .hat-toggle {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+#hat-sidebar .hat-toggle:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
 }
 
 /* ── Earnings bar ────────────────────────────────────────── */
