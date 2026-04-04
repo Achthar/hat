@@ -1,8 +1,10 @@
 let API_BASE = "https://hat-backend.achim-d87.workers.dev/api";
+let WEB_BASE = "https://hat.pages.dev";
 
 try {
-  chrome.storage.local.get("apiBase", (data) => {
+  chrome.storage.local.get(["apiBase", "webBase"], (data) => {
     if (data.apiBase) API_BASE = data.apiBase;
+    if (data.webBase) WEB_BASE = data.webBase;
   });
 } catch {}
 
@@ -248,13 +250,13 @@ async function linkWallet() {
 // ── Actions ───────────────────────────────────────────────────
 
 worldIdBtn.addEventListener("click", () => {
-  chrome.tabs.create({ url: "http://localhost:3000/verify" });
+  chrome.tabs.create({ url: `${WEB_BASE}/verify?autoclose=1` });
 });
 
 connectBtn.addEventListener("click", connectWallet);
 
 verifyBtn.addEventListener("click", () => {
-  chrome.tabs.create({ url: "http://localhost:3000/verify" });
+  chrome.tabs.create({ url: `${WEB_BASE}/verify?autoclose=1` });
 });
 
 linkWalletBtn.addEventListener("click", linkWallet);
