@@ -1,10 +1,8 @@
-"use client";
-
 import { useState } from "react";
 
 const API_BASE = "http://localhost:3001/api";
 
-export default function VerifyPage() {
+export function Verify() {
   const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
   const [error, setError] = useState("");
 
@@ -28,7 +26,7 @@ export default function VerifyPage() {
     <main style={{ maxWidth: 480, margin: "80px auto", padding: 32, textAlign: "center" }}>
       <h1>Verify Your Humanity</h1>
       <p style={{ color: "#6b7280" }}>
-        Prove you&apos;re human with World ID to start earning HAT and USDC.
+        Prove you're human with World ID to start earning HAT and USDC.
       </p>
 
       {status === "idle" && (

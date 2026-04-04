@@ -1,6 +1,6 @@
-"use client";
+import { Link } from "react-router-dom";
 
-export default function Home() {
+export function Home() {
   return (
     <main style={{ maxWidth: 960, margin: "0 auto", padding: 32 }}>
       <h1>HAT - Human Attention Token</h1>
@@ -15,6 +15,20 @@ export default function Home() {
           <li>Earn USDC micropayments + HAT tokens for every second of verified attention</li>
           <li>Advertisers pay only for real human views — no bots, no fraud</li>
         </ol>
+        <Link
+          to="/verify"
+          style={{
+            display: "inline-block",
+            padding: "10px 24px",
+            background: "#6366f1",
+            color: "white",
+            borderRadius: 8,
+            textDecoration: "none",
+            marginTop: 8,
+          }}
+        >
+          Verify with World ID
+        </Link>
       </section>
 
       {/* Demo ad banner area — the extension will inject/replace these */}
