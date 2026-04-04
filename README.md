@@ -40,6 +40,29 @@ A verified human attention marketplace where users earn USDC micropayments and H
 | `packages/web` | React + Vite | 3000 | Demo site + World ID verify page + wallet connect |
 | `packages/advertiser` | React + Vite | 3002 | Campaign management + USDC deposit on Arc |
 
+## What's Implemented
+
+- [x] pnpm monorepo with 6 packages
+- [x] **PayoutVault.sol** — advertiser USDC escrow, batch distribute to viewers, configurable platform fee (2.5%)
+- [x] **HATToken.sol** — ERC-20 with `batchMint()` for gas-efficient multi-recipient minting
+- [x] Foundry tests (5/5 passing) + Arc testnet deploy script
+- [x] Backend with SQLite persistence — users, view sessions, ads, settlements
+- [x] World ID v4 verification endpoint with nullifier uniqueness check
+- [x] Settlement service — aggregates unsettled sessions, calls `distribute()` + `batchMint()`
+- [x] Browser extension — ad sidebar injection, IntersectionObserver tracking, heartbeat loop, earnings display
+- [x] Wallet connection (MetaMask) on both frontends
+- [x] Advertiser USDC approve → deposit flow (with Arc testnet chain switching)
+- [x] Demo frontend with live stats from backend
+
+- [x] IDKit widget integrated for World ID verification (with RP signing backend)
+- [x] Dev mode: seed data, mock verification, settlement without on-chain (graceful fallback)
+- [x] Extension popup with live earnings refresh from backend
+- [x] End-to-end flow verified: seed ads → verify user → view ad → end session → settle → earnings update
+
+## What's Left
+
+- [ ] Deploy contracts to Arc testnet (need funded deployer key + USDC address)
+- [ ] Fill contract addresses in `packages/common/src/constants.ts` after deploy
 
 ## Quick Start
 
@@ -57,9 +80,22 @@ pnpm dev
 # backend:    http://localhost:3001
 # advertiser: http://localhost:3002
 
+# Seed demo ads for local testing
+curl -X POST http://localhost:3001/api/dev/seed
+
 # Build extension, then load dist/ as unpacked in chrome://extensions
 pnpm --filter @hat/extension build
 ```
+
+### Dev API Endpoints
+
+| Endpoint | Description |
+|---|---|
+| `POST /api/dev/seed` | Seed 3 demo ads |
+| `POST /api/dev/mock-verify` | Mock-verify a user (skip World ID) |
+| `POST /api/dev/reset` | Clear all data |
+| `GET /api/dev/stats` | Dashboard stats |
+| `POST /api/settlement/batch` | Trigger settlement batch |
 
 ## Flow
 

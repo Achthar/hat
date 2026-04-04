@@ -1,14 +1,7 @@
 import { ethers } from "ethers";
 import { PAYOUT_VAULT_ABI, HAT_TOKEN_ABI, CONTRACTS, ARC_TESTNET_RPC } from "@hat/common";
-import { db, stmts } from "../db.js";
-
-const provider = new ethers.JsonRpcProvider(process.env.ARC_RPC_URL || ARC_TESTNET_RPC);
-
-function getWallet() {
-  const key = process.env.DEPLOYER_PRIVATE_KEY;
-  if (!key) throw new Error("DEPLOYER_PRIVATE_KEY not set");
-  return new ethers.Wallet(key, provider);
-}
+import type { Env } from "../types.js";
+import * as db from "../db.js";
 
 export interface SettlementResult {
   id: string;
@@ -19,9 +12,8 @@ export interface SettlementResult {
   hatTxHash?: string;
 }
 
-/// Aggregate unsettled verified sessions and distribute USDC + mint HAT
-export async function runSettlement(): Promise<SettlementResult> {
-  const sessions = stmts.getUnsettledSessions.all() as Array<Record<string, unknown>>;
+export async function runSettlement(d1: D1Database, env: Env): Promise<SettlementResult> {
+  const sessions = await db.getUnsettledSessions(d1);
 
   if (sessions.length === 0) {
     return { id: "", recipientCount: 0, totalUsdc: 0, totalHat: 0 };
@@ -38,17 +30,14 @@ export async function runSettlement(): Promise<SettlementResult> {
     perUser.set(addr, existing);
   }
 
-  // Group by advertiser for vault distribution
+  // Group by advertiser
   const perAdvertiser = new Map<string, { recipients: string[]; amounts: bigint[] }>();
   for (const s of sessions) {
-    const ad = db.prepare("SELECT advertiser_address FROM ads WHERE id = ?").get(s.ad_id as string) as
-      | Record<string, unknown>
-      | undefined;
+    const ad = await db.getAdAdvertiser(d1, s.ad_id as string);
     if (!ad) continue;
     const advAddr = ad.advertiser_address as string;
     const existing = perAdvertiser.get(advAddr) || { recipients: [], amounts: [] };
     existing.recipients.push(s.user_address as string);
-    // USDC has 6 decimals
     existing.amounts.push(BigInt(Math.floor((s.usdc_earned as number) * 1e6)));
     perAdvertiser.set(advAddr, existing);
   }
@@ -59,73 +48,68 @@ export async function runSettlement(): Promise<SettlementResult> {
   let totalUsdc = 0;
   let totalHat = 0;
 
-  const wallet = getWallet();
+  const hasOnChain = !!env.DEPLOYER_PRIVATE_KEY && !!CONTRACTS.PAYOUT_VAULT;
 
-  // 1. Distribute USDC from each advertiser's vault deposit
-  if (CONTRACTS.PAYOUT_VAULT) {
-    const vault = new ethers.Contract(CONTRACTS.PAYOUT_VAULT, PAYOUT_VAULT_ABI, wallet);
-    for (const [advertiser, { recipients, amounts }] of perAdvertiser) {
-      try {
-        const tx = await vault.distribute(advertiser, recipients, amounts);
-        const receipt = await tx.wait();
-        vaultTxHash = receipt.hash;
-      } catch (e) {
-        console.error(`Vault distribute failed for advertiser ${advertiser}:`, e);
+  if (hasOnChain) {
+    const provider = new ethers.JsonRpcProvider(env.ARC_RPC_URL || ARC_TESTNET_RPC);
+    const wallet = new ethers.Wallet(env.DEPLOYER_PRIVATE_KEY, provider);
+
+    // Distribute USDC
+    if (CONTRACTS.PAYOUT_VAULT) {
+      const vault = new ethers.Contract(CONTRACTS.PAYOUT_VAULT, PAYOUT_VAULT_ABI, wallet);
+      for (const [advertiser, { recipients, amounts }] of perAdvertiser) {
+        try {
+          const tx = await vault.distribute(advertiser, recipients, amounts);
+          const receipt = await tx.wait();
+          vaultTxHash = receipt.hash;
+        } catch (e) {
+          console.error(`Vault distribute failed for ${advertiser}:`, e);
+        }
       }
     }
+
+    // Batch mint HAT
+    if (CONTRACTS.HAT_TOKEN) {
+      const allRecipients: string[] = [];
+      const allAmounts: bigint[] = [];
+      for (const [addr, data] of perUser) {
+        allRecipients.push(addr);
+        allAmounts.push(BigInt(Math.floor(data.hat * 1e18)));
+      }
+      if (allRecipients.length > 0) {
+        const hat = new ethers.Contract(CONTRACTS.HAT_TOKEN, HAT_TOKEN_ABI, wallet);
+        try {
+          const tx = await hat.batchMint(allRecipients, allAmounts);
+          const receipt = await tx.wait();
+          hatTxHash = receipt.hash;
+        } catch (e) {
+          console.error("HAT batchMint failed:", e);
+        }
+      }
+    }
+  } else {
+    console.log("[settlement] Skipping on-chain calls (no deployer key or contracts)");
   }
 
-  // 2. Batch mint HAT tokens to all recipients
+  // Compute totals
   const recipients: string[] = [];
-  const hatAmounts: bigint[] = [];
   for (const [addr, data] of perUser) {
     recipients.push(addr);
-    // HAT has 18 decimals
-    hatAmounts.push(BigInt(Math.floor(data.hat * 1e18)));
     totalUsdc += data.usdc;
     totalHat += data.hat;
   }
 
-  if (CONTRACTS.HAT_TOKEN && recipients.length > 0) {
-    const hat = new ethers.Contract(CONTRACTS.HAT_TOKEN, HAT_TOKEN_ABI, wallet);
-    try {
-      const tx = await hat.batchMint(recipients, hatAmounts);
-      const receipt = await tx.wait();
-      hatTxHash = receipt.hash;
-    } catch (e) {
-      console.error("HAT batchMint failed:", e);
+  // Mark settled + update earnings in D1
+  for (const [addr, data] of perUser) {
+    for (const sid of data.sessionIds) {
+      await db.markSettled(d1, settlementId, sid);
+    }
+    await db.updateUserEarnings(d1, data.hat, data.usdc, addr);
+    for (const s of sessions.filter((s) => s.user_address === addr)) {
+      await db.updateAdSpend(d1, s.usdc_earned as number, s.ad_id as string);
     }
   }
+  await db.insertSettlement(d1, settlementId, vaultTxHash ?? null, hatTxHash ?? null, totalUsdc, totalHat, recipients.length);
 
-  // 3. Mark sessions as settled and update user earnings
-  const markSettledMany = db.transaction(() => {
-    for (const [addr, data] of perUser) {
-      for (const sid of data.sessionIds) {
-        stmts.markSettled.run(settlementId, sid);
-      }
-      stmts.updateUserEarnings.run(data.hat, data.usdc, addr);
-      // Update ad spend
-      for (const s of sessions.filter((s) => s.user_address === addr)) {
-        stmts.updateAdSpend.run(s.usdc_earned, s.ad_id);
-      }
-    }
-    stmts.insertSettlement.run(
-      settlementId,
-      vaultTxHash ?? null,
-      hatTxHash ?? null,
-      totalUsdc,
-      totalHat,
-      recipients.length
-    );
-  });
-  markSettledMany();
-
-  return {
-    id: settlementId,
-    recipientCount: recipients.length,
-    totalUsdc,
-    totalHat,
-    vaultTxHash,
-    hatTxHash,
-  };
+  return { id: settlementId, recipientCount: recipients.length, totalUsdc, totalHat, vaultTxHash, hatTxHash };
 }

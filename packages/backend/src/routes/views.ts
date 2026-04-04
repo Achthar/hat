@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { RATE_PER_SECOND_USDC, HAT_PER_SECOND } from "@hat/common";
-import { stmts } from "../db.js";
+import type { Env } from "../types.js";
+import * as db from "../db.js";
 
-export const viewRoutes = new Hono();
+export const viewRoutes = new Hono<{ Bindings: Env }>();
 
 /// Start tracking an ad view session
 viewRoutes.post("/start", async (c) => {
@@ -10,7 +11,7 @@ viewRoutes.post("/start", async (c) => {
   if (!userId || !adId) return c.json({ error: "userId and adId required" }, 400);
 
   const sessionId = `${userId}-${adId}-${Date.now()}`;
-  stmts.insertSession.run(sessionId, userId, adId, Date.now());
+  await db.insertSession(c.env.DB, sessionId, userId, adId, Date.now());
 
   return c.json({ sessionId });
 });
@@ -18,21 +19,17 @@ viewRoutes.post("/start", async (c) => {
 /// End an ad view session and calculate earnings
 viewRoutes.post("/end", async (c) => {
   const { sessionId } = await c.req.json();
-  const session = stmts.getSession.get(sessionId) as Record<string, unknown> | undefined;
+  const session = await db.getSession(c.env.DB, sessionId);
 
-  if (!session) {
-    return c.json({ error: "Session not found" }, 404);
-  }
-  if (session.ended_at) {
-    return c.json({ error: "Session already ended" }, 400);
-  }
+  if (!session) return c.json({ error: "Session not found" }, 404);
+  if (session.ended_at) return c.json({ error: "Session already ended" }, 400);
 
   const endedAt = Date.now();
   const durationSeconds = Math.floor((endedAt - (session.started_at as number)) / 1000);
   const usdcEarned = durationSeconds * RATE_PER_SECOND_USDC;
   const hatEarned = durationSeconds * HAT_PER_SECOND;
 
-  stmts.endSession.run(endedAt, durationSeconds, usdcEarned, hatEarned, sessionId);
+  await db.endSession(c.env.DB, sessionId, endedAt, durationSeconds, usdcEarned, hatEarned);
 
   return c.json({
     sessionId,
@@ -44,10 +41,10 @@ viewRoutes.post("/end", async (c) => {
   });
 });
 
-/// Heartbeat — extension pings to confirm user is still viewing
+/// Heartbeat
 viewRoutes.post("/heartbeat", async (c) => {
   const { sessionId } = await c.req.json();
-  const session = stmts.getSession.get(sessionId) as Record<string, unknown> | undefined;
+  const session = await db.getSession(c.env.DB, sessionId);
   if (!session || session.ended_at) {
     return c.json({ error: "Session not found or ended" }, 404);
   }

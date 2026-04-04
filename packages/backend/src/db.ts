@@ -1,115 +1,80 @@
-import Database from "better-sqlite3";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
+/// D1 query helpers — all async, take db as first arg
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = process.env.DATABASE_URL || join(__dirname, "..", "hat.db");
+type D1 = D1Database;
+type Row = Record<string, unknown>;
 
-export const db = new Database(DB_PATH);
+export async function upsertUser(db: D1, address: string) {
+  await db.prepare("INSERT INTO users (address, verified) VALUES (?, 0) ON CONFLICT(address) DO NOTHING").bind(address).run();
+}
 
-// Enable WAL mode for better concurrent performance
-db.pragma("journal_mode = WAL");
+export async function verifyUser(db: D1, nullifier: string, address: string) {
+  await db.prepare("UPDATE users SET verified = 1, nullifier = ? WHERE address = ?").bind(nullifier, address).run();
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    address TEXT PRIMARY KEY,
-    nullifier TEXT UNIQUE,
-    verified INTEGER NOT NULL DEFAULT 0,
-    total_hat_earned REAL NOT NULL DEFAULT 0,
-    total_usdc_earned REAL NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL DEFAULT (unixepoch())
-  );
+export async function getUser(db: D1, address: string): Promise<Row | null> {
+  return db.prepare("SELECT * FROM users WHERE address = ?").bind(address).first();
+}
 
-  CREATE TABLE IF NOT EXISTS view_sessions (
-    id TEXT PRIMARY KEY,
-    user_address TEXT NOT NULL,
-    ad_id TEXT NOT NULL,
-    started_at INTEGER NOT NULL,
-    ended_at INTEGER,
-    duration_seconds INTEGER NOT NULL DEFAULT 0,
-    usdc_earned REAL NOT NULL DEFAULT 0,
-    hat_earned REAL NOT NULL DEFAULT 0,
-    settled INTEGER NOT NULL DEFAULT 0,
-    settlement_id TEXT,
-    FOREIGN KEY (user_address) REFERENCES users(address)
-  );
+export async function getUserByNullifier(db: D1, nullifier: string): Promise<Row | null> {
+  return db.prepare("SELECT * FROM users WHERE nullifier = ?").bind(nullifier).first();
+}
 
-  CREATE TABLE IF NOT EXISTS ads (
-    id TEXT PRIMARY KEY,
-    advertiser_address TEXT NOT NULL,
-    image_url TEXT NOT NULL,
-    target_url TEXT NOT NULL,
-    title TEXT NOT NULL,
-    budget_allocated_usdc REAL NOT NULL DEFAULT 0,
-    budget_spent_usdc REAL NOT NULL DEFAULT 0,
-    active INTEGER NOT NULL DEFAULT 1,
-    created_at INTEGER NOT NULL DEFAULT (unixepoch())
-  );
+export async function insertSession(db: D1, id: string, userAddress: string, adId: string, startedAt: number) {
+  await db.prepare("INSERT INTO view_sessions (id, user_address, ad_id, started_at) VALUES (?, ?, ?, ?)").bind(id, userAddress, adId, startedAt).run();
+}
 
-  CREATE TABLE IF NOT EXISTS settlements (
-    id TEXT PRIMARY KEY,
-    vault_tx_hash TEXT,
-    hat_tx_hash TEXT,
-    total_usdc REAL NOT NULL DEFAULT 0,
-    total_hat REAL NOT NULL DEFAULT 0,
-    recipient_count INTEGER NOT NULL DEFAULT 0,
-    settled_at INTEGER NOT NULL DEFAULT (unixepoch())
-  );
+export async function getSession(db: D1, id: string): Promise<Row | null> {
+  return db.prepare("SELECT * FROM view_sessions WHERE id = ?").bind(id).first();
+}
 
-  CREATE INDEX IF NOT EXISTS idx_sessions_unsettled ON view_sessions(settled) WHERE settled = 0;
-  CREATE INDEX IF NOT EXISTS idx_sessions_user ON view_sessions(user_address);
-  CREATE INDEX IF NOT EXISTS idx_ads_active ON ads(active) WHERE active = 1;
-`);
+export async function endSession(db: D1, id: string, endedAt: number, durationSeconds: number, usdcEarned: number, hatEarned: number) {
+  await db.prepare("UPDATE view_sessions SET ended_at = ?, duration_seconds = ?, usdc_earned = ?, hat_earned = ? WHERE id = ?").bind(endedAt, durationSeconds, usdcEarned, hatEarned, id).run();
+}
 
-// Prepared statements for hot paths
-export const stmts = {
-  upsertUser: db.prepare(`
-    INSERT INTO users (address, verified) VALUES (?, 0)
-    ON CONFLICT(address) DO NOTHING
-  `),
-  verifyUser: db.prepare(`
-    UPDATE users SET verified = 1, nullifier = ? WHERE address = ?
-  `),
-  getUser: db.prepare(`SELECT * FROM users WHERE address = ?`),
-  getUserByNullifier: db.prepare(`SELECT * FROM users WHERE nullifier = ?`),
-
-  insertSession: db.prepare(`
-    INSERT INTO view_sessions (id, user_address, ad_id, started_at)
-    VALUES (?, ?, ?, ?)
-  `),
-  endSession: db.prepare(`
-    UPDATE view_sessions SET ended_at = ?, duration_seconds = ?, usdc_earned = ?, hat_earned = ?
-    WHERE id = ?
-  `),
-  getSession: db.prepare(`SELECT * FROM view_sessions WHERE id = ?`),
-  getUnsettledSessions: db.prepare(`
+export async function getUnsettledSessions(db: D1): Promise<Row[]> {
+  const result = await db.prepare(`
     SELECT vs.*, u.verified FROM view_sessions vs
     JOIN users u ON vs.user_address = u.address
     WHERE vs.settled = 0 AND vs.ended_at IS NOT NULL AND u.verified = 1
-  `),
-  markSettled: db.prepare(`
-    UPDATE view_sessions SET settled = 1, settlement_id = ? WHERE id = ?
-  `),
-  updateUserEarnings: db.prepare(`
-    UPDATE users SET total_hat_earned = total_hat_earned + ?, total_usdc_earned = total_usdc_earned + ?
-    WHERE address = ?
-  `),
+  `).all();
+  return result.results as Row[];
+}
 
-  insertAd: db.prepare(`
-    INSERT INTO ads (id, advertiser_address, image_url, target_url, title, budget_allocated_usdc)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `),
-  getActiveAds: db.prepare(`
-    SELECT * FROM ads WHERE active = 1 AND budget_spent_usdc < budget_allocated_usdc
-  `),
-  getAdsByAdvertiser: db.prepare(`SELECT * FROM ads WHERE advertiser_address = ?`),
-  updateAdSpend: db.prepare(`
-    UPDATE ads SET budget_spent_usdc = budget_spent_usdc + ? WHERE id = ?
-  `),
+export async function markSettled(db: D1, settlementId: string, sessionId: string) {
+  await db.prepare("UPDATE view_sessions SET settled = 1, settlement_id = ? WHERE id = ?").bind(settlementId, sessionId).run();
+}
 
-  insertSettlement: db.prepare(`
-    INSERT INTO settlements (id, vault_tx_hash, hat_tx_hash, total_usdc, total_hat, recipient_count)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `),
-  getSettlements: db.prepare(`SELECT * FROM settlements ORDER BY settled_at DESC LIMIT 50`),
-};
+export async function updateUserEarnings(db: D1, hat: number, usdc: number, address: string) {
+  await db.prepare("UPDATE users SET total_hat_earned = total_hat_earned + ?, total_usdc_earned = total_usdc_earned + ? WHERE address = ?").bind(hat, usdc, address).run();
+}
+
+export async function insertAd(db: D1, id: string, advertiserAddress: string, imageUrl: string, targetUrl: string, title: string, budgetUsdc: number) {
+  await db.prepare("INSERT INTO ads (id, advertiser_address, image_url, target_url, title, budget_allocated_usdc) VALUES (?, ?, ?, ?, ?, ?)").bind(id, advertiserAddress, imageUrl, targetUrl, title, budgetUsdc).run();
+}
+
+export async function getActiveAds(db: D1): Promise<Row[]> {
+  const result = await db.prepare("SELECT * FROM ads WHERE active = 1 AND budget_spent_usdc < budget_allocated_usdc").all();
+  return result.results as Row[];
+}
+
+export async function getAdsByAdvertiser(db: D1, address: string): Promise<Row[]> {
+  const result = await db.prepare("SELECT * FROM ads WHERE advertiser_address = ?").bind(address).all();
+  return result.results as Row[];
+}
+
+export async function updateAdSpend(db: D1, amount: number, adId: string) {
+  await db.prepare("UPDATE ads SET budget_spent_usdc = budget_spent_usdc + ? WHERE id = ?").bind(amount, adId).run();
+}
+
+export async function getAdAdvertiser(db: D1, adId: string): Promise<Row | null> {
+  return db.prepare("SELECT advertiser_address FROM ads WHERE id = ?").bind(adId).first();
+}
+
+export async function insertSettlement(db: D1, id: string, vaultTxHash: string | null, hatTxHash: string | null, totalUsdc: number, totalHat: number, recipientCount: number) {
+  await db.prepare("INSERT INTO settlements (id, vault_tx_hash, hat_tx_hash, total_usdc, total_hat, recipient_count) VALUES (?, ?, ?, ?, ?, ?)").bind(id, vaultTxHash, hatTxHash, totalUsdc, totalHat, recipientCount).run();
+}
+
+export async function getSettlements(db: D1): Promise<Row[]> {
+  const result = await db.prepare("SELECT * FROM settlements ORDER BY settled_at DESC LIMIT 50").all();
+  return result.results as Row[];
+}

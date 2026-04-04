@@ -1,0 +1,14 @@
+name = "hat-backend"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+
+[vars]
+WORLD_ID_RP_ID = ""
+WORLD_ID_SIGNING_KEY = ""
+DEPLOYER_PRIVATE_KEY = ""
+ARC_RPC_URL = "https://testnet-rpc.arc.circle.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hat-db"
+database_id = ""  # Run `wrangler d1 create hat-db` and paste the ID here

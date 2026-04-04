@@ -1,11 +1,12 @@
 import { Hono } from "hono";
-import { stmts } from "../db.js";
+import type { Env } from "../types.js";
+import * as db from "../db.js";
 
-export const adRoutes = new Hono();
+export const adRoutes = new Hono<{ Bindings: Env }>();
 
 /// Get active ads to display in extension
 adRoutes.get("/active", async (c) => {
-  const ads = stmts.getActiveAds.all();
+  const ads = await db.getActiveAds(c.env.DB);
   return c.json({ ads });
 });
 
@@ -14,14 +15,7 @@ adRoutes.post("/create", async (c) => {
   const body = await c.req.json();
   const id = crypto.randomUUID();
 
-  stmts.insertAd.run(
-    id,
-    body.advertiserId,
-    body.imageUrl,
-    body.targetUrl,
-    body.title,
-    body.budgetUsdc ?? 0
-  );
+  await db.insertAd(c.env.DB, id, body.advertiserId, body.imageUrl, body.targetUrl, body.title, body.budgetUsdc ?? 0);
 
   return c.json({
     id,
@@ -38,6 +32,6 @@ adRoutes.post("/create", async (c) => {
 /// Get ads by advertiser
 adRoutes.get("/by-advertiser/:address", async (c) => {
   const address = c.req.param("address");
-  const ads = stmts.getAdsByAdvertiser.all(address);
+  const ads = await db.getAdsByAdvertiser(c.env.DB, address);
   return c.json({ ads });
 });

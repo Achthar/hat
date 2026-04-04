@@ -17,8 +17,9 @@ packages/contracts/broadcast/
 # Extension
 packages/extension/dist/
 
-# Backend DB
-*.db
+# Cloudflare Workers
+.wrangler/
+wrangler.toml
 
 # Foundry libs
 packages/contracts/lib/

@@ -1,13 +1,14 @@
 import { Hono } from "hono";
+import type { Env } from "../types.js";
 import { runSettlement } from "../services/settlement.js";
-import { stmts } from "../db.js";
+import * as db from "../db.js";
 
-export const settlementRoutes = new Hono();
+export const settlementRoutes = new Hono<{ Bindings: Env }>();
 
-/// Trigger batch settlement — distributes USDC + mints HAT for all unsettled sessions
+/// Trigger batch settlement
 settlementRoutes.post("/batch", async (c) => {
   try {
-    const result = await runSettlement();
+    const result = await runSettlement(c.env.DB, c.env);
     if (result.recipientCount === 0) {
       return c.json({ message: "No unsettled sessions to process" });
     }
@@ -20,6 +21,6 @@ settlementRoutes.post("/batch", async (c) => {
 
 /// Get settlement history
 settlementRoutes.get("/history", async (c) => {
-  const batches = stmts.getSettlements.all();
+  const batches = await db.getSettlements(c.env.DB);
   return c.json({ batches });
 });
