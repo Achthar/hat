@@ -40,6 +40,26 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       nullifier: null,
       hatEarned: 0,
       usdcEarned: 0,
+      sidebarCollapsed: false,
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (msg.type === "ACCOUNT_CHANGED") {
+    const newAddress = msg.address;
+    chrome.storage.local.get("userId", (data) => {
+      if (data.userId && data.userId !== "anonymous" && data.userId !== newAddress) {
+        // Address changed — reset state for the new account
+        chrome.storage.local.set({
+          userId: newAddress,
+          verified: false,
+          nullifier: null,
+          hatEarned: 0,
+          usdcEarned: 0,
+          sidebarCollapsed: false,
+        });
+      }
     });
     sendResponse({ ok: true });
     return true;

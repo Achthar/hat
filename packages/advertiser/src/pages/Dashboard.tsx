@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { ethers } from "ethers";
-import { ARC_TESTNET_CHAIN_ID, RATE_PER_SECOND_USDC } from "@hat/common";
+import { ARC_TESTNET_CHAIN_ID, ARC_TESTNET_RPC, RATE_PER_SECOND_USDC } from "@hat/common";
 import { useWallet } from "../hooks/useWallet.js";
 import { DEFAULT_API_URL } from "@hat/common";
 
@@ -68,6 +68,7 @@ export function Dashboard() {
   const [form, setForm] = useState({ title: "", imageUrl: "", targetUrl: "", budgetUsdc: "", viewRate: "", clickReward: "" });
   const [depositStatus, setDepositStatus] = useState("");
   const [nativeBalance, setNativeBalance] = useState<string | null>(null);
+  const [arcBalance, setArcBalance] = useState<string | null>(null);
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus | null>(null);
   const [advBalance, setAdvBalance] = useState<AdvBalance | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
@@ -111,11 +112,19 @@ export function Dashboard() {
   }
 
   async function loadBalance(addr: string) {
-    if (!window.ethereum) return;
+    // Fetch from wallet provider (whatever chain MetaMask is on)
+    if (window.ethereum) {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const bal = await provider.getBalance(addr);
+        setNativeBalance(ethers.formatEther(bal));
+      } catch {}
+    }
+    // Always fetch Arc Testnet USDC balance directly via RPC (works regardless of MetaMask chain)
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const bal = await provider.getBalance(addr);
-      setNativeBalance(ethers.formatEther(bal));
+      const arcProvider = new ethers.JsonRpcProvider(ARC_TESTNET_RPC);
+      const bal = await arcProvider.getBalance(addr);
+      setArcBalance(ethers.formatEther(bal));
     } catch {}
   }
 
@@ -295,10 +304,15 @@ export function Dashboard() {
         ) : (
           <>
             {/* ── Live Spend Overview ─────────────────────── */}
-            {advBalance && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 24 }}>
-                <MiniCard label="Deposited" value={`$${advBalance.totalDeposited.toFixed(2)}`} accent={c.indigo} />
-                <MiniCard label="Settled" value={`$${advBalance.totalSpent.toFixed(4)}`} accent={c.green} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 24 }}>
+              <MiniCard
+                label="Wallet USDC (Arc)"
+                value={arcBalance !== null ? `$${Number(arcBalance).toFixed(2)}` : "—"}
+                accent={c.indigo}
+                sub="On-chain balance"
+              />
+              {advBalance && <>
+                <MiniCard label="Deposited" value={`$${advBalance.totalDeposited.toFixed(2)}`} accent={c.green} />
                 <MiniCard
                   label="Accruing"
                   value={`$${liveAccrued.toFixed(4)}`}
@@ -310,9 +324,10 @@ export function Dashboard() {
                   label="Available"
                   value={`$${Math.max(0, liveAvailable).toFixed(2)}`}
                   accent={liveAvailable > 0 ? c.indigo : c.rose}
+                  sub={`Settled: $${advBalance.totalSpent.toFixed(4)}`}
                 />
-              </div>
-            )}
+              </>}
+            </div>
 
             {/* ── Gateway Badge + Withdraw ────────────────── */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>

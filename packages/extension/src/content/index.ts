@@ -1,3 +1,5 @@
+export {}; // ensure this file is treated as a module
+
 let API_BASE = "https://hat-backend.achim-d87.workers.dev/api";
 const HEARTBEAT_INTERVAL = 15_000;
 
@@ -775,4 +777,39 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes.userId?.newValue && changes.userId.newValue !== "anonymous") {
     activate();
   }
+  // If userId was reset (account change or disconnect), refresh earnings display
+  if (changes.usdcEarned || changes.hatEarned) {
+    updateEarningsDisplay();
+  }
 });
+
+// Detect wallet account changes via window.ethereum
+try {
+  const eth = (window as unknown as { ethereum?: { on?: (event: string, handler: (accounts: string[]) => void) => void } }).ethereum;
+  if (eth?.on) {
+    eth.on("accountsChanged", (accounts: string[]) => {
+      if (accounts.length === 0) {
+        // Wallet disconnected — end all sessions
+        activeSessions.forEach(({ sessionId, heartbeatTimer }) => {
+          clearInterval(heartbeatTimer);
+          endViewSession(sessionId);
+        });
+        activeSessions.clear();
+        chrome.runtime.sendMessage({ type: "DISCONNECT" });
+      } else {
+        // Account switched — notify background to reset state
+        chrome.runtime.sendMessage({ type: "ACCOUNT_CHANGED", address: accounts[0] });
+        // End current sessions (they belong to the old address)
+        activeSessions.forEach(({ sessionId, heartbeatTimer }) => {
+          clearInterval(heartbeatTimer);
+          endViewSession(sessionId);
+        });
+        activeSessions.clear();
+        // Sync new account's earnings
+        syncEarningsFromBackend();
+      }
+    });
+  }
+} catch {
+  // not in a page with ethereum provider
+}
