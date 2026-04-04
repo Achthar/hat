@@ -28,6 +28,38 @@ export function Verify() {
   const [status, setStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
   const [error, setError] = useState("");
   const [verifiedAddress, setVerifiedAddress] = useState<string | null>(null);
+  const [bypassLoading, setBypassLoading] = useState(false);
+
+  async function emergencyBypass() {
+    setBypassLoading(true);
+    try {
+      let addr = user.address;
+      if (!addr) {
+        if (!window.ethereum) { alert("Please install a wallet extension"); return; }
+        const accounts = (await window.ethereum.request({ method: "eth_requestAccounts" })) as string[];
+        addr = accounts[0];
+        await fetch(`${API_BASE}/auth/connect-wallet`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: addr }),
+        });
+      }
+      const res = await fetch(`${API_BASE}/dev/mock-verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: addr }),
+      });
+      if (!res.ok) throw new Error("Bypass failed");
+      setVerifiedAddress(addr!);
+      setStatus("success");
+      refreshUser();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Bypass failed");
+      setStatus("error");
+    } finally {
+      setBypassLoading(false);
+    }
+  }
 
   // Called by IDKit after proof is generated — address is optional
   async function handleVerify(proof: ISuccessResult) {
@@ -173,6 +205,24 @@ export function Verify() {
             <p style={{ fontSize: 12, color: c.muted, marginTop: 16, opacity: 0.7 }}>
               World ID 4.0 — Orb verification
             </p>
+
+            <div style={{ marginTop: 24, borderTop: `1px solid ${c.border}`, paddingTop: 16 }}>
+              <button
+                onClick={emergencyBypass}
+                disabled={bypassLoading}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: c.muted,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  opacity: 0.6,
+                }}
+              >
+                {bypassLoading ? "Verifying..." : "Emergency login (skip World ID)"}
+              </button>
+            </div>
           </>
         ) : status === "verifying" ? (
           <div style={{ padding: "24px 0" }}>
