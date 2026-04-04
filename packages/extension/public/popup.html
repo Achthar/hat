@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body { width: 320px; padding: 16px; font-family: system-ui, sans-serif; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    .stats { background: #f5f5f5; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+    .stat { display: flex; justify-content: space-between; margin: 4px 0; }
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-secondary { background: #e5e7eb; color: #374151; margin-top: 8px; }
+    #status { text-align: center; color: #6b7280; font-size: 12px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>HAT</h1>
+  <div class="stats">
+    <div class="stat"><span>HAT Earned</span><span id="hat-earned">0</span></div>
+    <div class="stat"><span>USDC Earned</span><span id="usdc-earned">$0.00</span></div>
+    <div class="stat"><span>Status</span><span id="verified-status">Not Verified</span></div>
+  </div>
+  <button class="btn btn-primary" id="verify-btn">Verify with World ID</button>
+  <button class="btn btn-secondary" id="connect-btn">Connect Wallet</button>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
