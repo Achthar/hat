@@ -749,10 +749,33 @@ async function activate() {
   setInterval(scanAndReplace, 8000);
 }
 
+function deactivate() {
+  if (!initialized) return;
+  initialized = false;
+
+  // End all active sessions
+  activeSessions.forEach(({ sessionId, heartbeatTimer }) => {
+    clearInterval(heartbeatTimer);
+    navigator.sendBeacon(`${API_BASE}/views/end`, JSON.stringify({ sessionId }));
+  });
+  activeSessions.clear();
+
+  // Remove sidebar
+  const sidebar = document.getElementById("hat-sidebar");
+  if (sidebar) sidebar.remove();
+  document.body.classList.remove("hat-active", "hat-collapsed-active");
+
+  // Remove all replaced ads (they'll revert on next page load)
+  sidebarSlots.length = 0;
+  cachedAds = [];
+}
+
 function checkAuthAndActivate() {
   chrome.storage.local.get("userId", (data) => {
     if (data.userId && data.userId !== "anonymous") {
       activate();
+    } else {
+      deactivate();
     }
   });
 }
@@ -774,10 +797,14 @@ checkAuthAndActivate();
 // Also listen for storage changes — if user connects wallet while page is open,
 // activate immediately without requiring a refresh
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.userId?.newValue && changes.userId.newValue !== "anonymous") {
-    activate();
+  if (changes.userId) {
+    if (changes.userId.newValue && changes.userId.newValue !== "anonymous") {
+      activate();
+    } else {
+      // Disconnected — remove sidebar and stop sessions
+      deactivate();
+    }
   }
-  // If userId was reset (account change or disconnect), refresh earnings display
   if (changes.usdcEarned || changes.hatEarned) {
     updateEarningsDisplay();
   }
