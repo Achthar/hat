@@ -240,7 +240,7 @@ export function Dashboard() {
       <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", maxWidth: 900, margin: "0 auto", padding: "20px 32px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <img src="/hat-logo.svg" alt="HAT" width={36} height={36} />
-          <span style={{ fontSize: 18, fontWeight: 700, color: c.text }}>Advertiser</span>
+          <span style={{ fontSize: 18, fontWeight: 700, color: c.text }}>HATvertisers Console</span>
         </div>
         {address ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10, background: c.card, border: `1px solid ${c.border}`, borderRadius: 100, padding: "8px 16px", fontSize: 13 }}>

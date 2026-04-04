@@ -661,9 +661,14 @@ window.addEventListener("beforeunload", () => {
   });
 });
 
-// ── Init ─────────────────────────────────────────────────────
+// ── Init — only activate when user has connected a wallet ────
 
-(async () => {
+let initialized = false;
+
+async function activate() {
+  if (initialized) return;
+  initialized = true;
+
   cachedAds = await fetchActiveAds();
   if (cachedAds.length === 0) return;
 
@@ -671,7 +676,7 @@ window.addEventListener("beforeunload", () => {
 
   // Sync earnings from backend so counter doesn't reset on reload
   syncEarningsFromBackend();
-  setInterval(syncEarningsFromBackend, 30_000); // refresh every 30s
+  setInterval(syncEarningsFromBackend, 30_000);
 
   // Initial scan
   scanAndReplace();
@@ -686,4 +691,23 @@ window.addEventListener("beforeunload", () => {
 
   // Re-scan periodically for SPAs that swap page content
   setInterval(scanAndReplace, 8000);
-})();
+}
+
+function checkAuthAndActivate() {
+  chrome.storage.local.get("userId", (data) => {
+    if (data.userId && data.userId !== "anonymous") {
+      activate();
+    }
+  });
+}
+
+// Check on page load
+checkAuthAndActivate();
+
+// Also listen for storage changes — if user connects wallet while page is open,
+// activate immediately without requiring a refresh
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.userId?.newValue && changes.userId.newValue !== "anonymous") {
+    activate();
+  }
+});
