@@ -145,6 +145,26 @@ function updateEarningsDisplay() {
   });
 }
 
+// Sync earnings from backend so they persist across page reloads
+async function syncEarningsFromBackend() {
+  try {
+    const userId = await getUserId();
+    if (userId === "anonymous") return;
+    const res = await fetch(`${API_BASE}/auth/user/${userId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.totalUsdcEarned !== undefined) {
+      chrome.storage.local.set({
+        usdcEarned: data.totalUsdcEarned,
+        hatEarned: data.totalHatEarned,
+      });
+      updateEarningsDisplay();
+    }
+  } catch {
+    // silent
+  }
+}
+
 // ── View tracking via IntersectionObserver ────────────────────
 
 const viewObserver = new IntersectionObserver(
@@ -648,6 +668,10 @@ window.addEventListener("beforeunload", () => {
   if (cachedAds.length === 0) return;
 
   createSidebar(cachedAds);
+
+  // Sync earnings from backend so counter doesn't reset on reload
+  syncEarningsFromBackend();
+  setInterval(syncEarningsFromBackend, 30_000); // refresh every 30s
 
   // Initial scan
   scanAndReplace();

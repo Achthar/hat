@@ -14,10 +14,10 @@ export interface SettlementResult {
   hatTxHash?: string;
 }
 
-export async function runSettlement(d1: D1Database, env: Env): Promise<SettlementResult> {
+export async function runSettlement(d1: D1Database, env: Env, requireVerified = true): Promise<SettlementResult> {
   const [sessions, clicks] = await Promise.all([
-    db.getUnsettledSessions(d1),
-    db.getUnsettledClicks(d1),
+    db.getUnsettledSessions(d1, requireVerified),
+    db.getUnsettledClicks(d1, requireVerified),
   ]);
 
   if (sessions.length === 0 && clicks.length === 0) {

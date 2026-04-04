@@ -8,7 +8,17 @@ export const settlementRoutes = new Hono<{ Bindings: Env }>();
 /// Trigger batch settlement
 settlementRoutes.post("/batch", async (c) => {
   try {
-    const result = await runSettlement(c.env.DB, c.env);
+    // Pass includeUnverified=true via query param or body for demo mode
+    let includeUnverified = false;
+    try {
+      const body = await c.req.json();
+      includeUnverified = body?.includeUnverified === true;
+    } catch {
+      // No body — default to verified-only
+    }
+    const requireVerified = !includeUnverified;
+
+    const result = await runSettlement(c.env.DB, c.env, requireVerified);
     if (result.recipientCount === 0) {
       return c.json({ message: "No unsettled sessions to process" });
     }

@@ -31,11 +31,12 @@ export async function endSession(db: D1, id: string, endedAt: number, durationSe
   await db.prepare("UPDATE view_sessions SET ended_at = ?, duration_seconds = ?, usdc_earned = ?, hat_earned = ? WHERE id = ?").bind(endedAt, durationSeconds, usdcEarned, hatEarned, id).run();
 }
 
-export async function getUnsettledSessions(db: D1): Promise<Row[]> {
+export async function getUnsettledSessions(db: D1, requireVerified = true): Promise<Row[]> {
+  const verifiedClause = requireVerified ? "AND u.verified = 1" : "";
   const result = await db.prepare(`
     SELECT vs.*, u.verified FROM view_sessions vs
     JOIN users u ON vs.user_address = u.address
-    WHERE vs.settled = 0 AND vs.ended_at IS NOT NULL AND u.verified = 1
+    WHERE vs.settled = 0 AND vs.ended_at IS NOT NULL ${verifiedClause}
   `).all();
   return result.results as Row[];
 }
@@ -132,11 +133,12 @@ export async function insertClick(db: D1, id: string, userAddress: string, adId:
   await db.prepare("INSERT INTO ad_clicks (id, user_address, ad_id, session_id, usdc_reward, hat_reward) VALUES (?, ?, ?, ?, ?, ?)").bind(id, userAddress, adId, sessionId ?? null, usdcReward, hatReward).run();
 }
 
-export async function getUnsettledClicks(db: D1): Promise<Row[]> {
+export async function getUnsettledClicks(db: D1, requireVerified = true): Promise<Row[]> {
+  const verifiedClause = requireVerified ? "AND u.verified = 1" : "";
   const result = await db.prepare(`
     SELECT c.*, u.verified FROM ad_clicks c
     JOIN users u ON c.user_address = u.address
-    WHERE c.settled = 0 AND u.verified = 1
+    WHERE c.settled = 0 ${verifiedClause}
   `).all();
   return result.results as Row[];
 }
