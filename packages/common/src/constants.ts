@@ -8,6 +8,14 @@ export const CONTRACTS = {
   USDC: "" as `0x${string}`,
 } as const;
 
+export const ARC_TESTNET = {
+  id: ARC_TESTNET_CHAIN_ID,
+  name: "Arc Testnet",
+  nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+  rpcUrls: { default: { http: [ARC_TESTNET_RPC] } },
+  blockExplorers: { default: { name: "Arc Explorer", url: "https://testnet-explorer.arc.circle.com" } },
+} as const;
+
 export const WORLD_ID_ACTION = "hat-verify-human";
 export const WORLD_ID_VERIFY_URL = "https://developer.world.org/api/v4/verify";
 
