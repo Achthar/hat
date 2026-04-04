@@ -221,19 +221,24 @@ function createHatAd(ad: Ad, matchedSize?: { width: string; height: string }): H
   container.dataset.adId = ad.id;
   container.style.cssText = `
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    overflow:hidden;border-radius:8px;border:1px solid #e5e7eb;background:#fff;
+    overflow:hidden;border-radius:12px;border:1px solid rgba(99,102,241,0.15);
+    background:rgba(15,11,46,0.04);backdrop-filter:blur(8px);
+    box-shadow:0 2px 12px rgba(99,102,241,0.06);position:relative;
     ${matchedSize ? `width:${matchedSize.width};height:${matchedSize.height};` : "padding:12px;"}
   `;
   container.innerHTML = `
-    <a href="${ad.target_url}" target="_blank" rel="noopener" style="display:block;width:100%;height:100%;">
+    <a href="${ad.target_url}" target="_blank" rel="noopener" style="display:block;width:100%;height:100%;border-radius:12px;overflow:hidden;">
       <img src="${ad.image_url}" alt="${ad.title}"
-        style="width:100%;height:100%;object-fit:cover;border-radius:6px;" />
+        style="width:100%;height:100%;object-fit:cover;transition:transform .2s,filter .2s;"
+        onmouseenter="this.style.transform='scale(1.02)';this.style.filter='brightness(1.05)'"
+        onmouseleave="this.style.transform='none';this.style.filter='none'" />
     </a>
-    <div style="position:absolute;bottom:2px;right:6px;font-size:10px;color:#9ca3af;background:rgba(255,255,255,0.85);padding:1px 4px;border-radius:3px;">
-      HAT Ad · ${ad.title}
+    <div style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,0.7);
+      background:rgba(15,11,46,0.65);backdrop-filter:blur(8px);padding:3px 8px;border-radius:8px;
+      border:1px solid rgba(255,255,255,0.08);font-weight:500;">
+      HAT · ${ad.title}
     </div>
   `;
-  container.style.position = "relative";
   return container;
 }
 
@@ -332,10 +337,10 @@ function createSidebar(ads: Ad[]) {
 
   sidebar.innerHTML = `
     <div class="hat-header">
-      <span>HAT Ads</span>
-      <span id="hat-session-earnings">0 HAT · $0.00</span>
+      <span>HAT</span>
+      <span id="hat-session-earnings" style="font-size:12px;font-weight:600;color:#fbbf24;">0 HAT · $0.00</span>
     </div>
-    <div class="hat-earnings">Earn HAT & USDC by viewing ads</div>
+    <div class="hat-earnings">Earning rewards for your attention</div>
     ${ads
       .map(
         (ad) => `
@@ -343,7 +348,7 @@ function createSidebar(ads: Ad[]) {
         <a href="${ad.target_url}" target="_blank">
           <img src="${ad.image_url}" alt="${ad.title}" />
         </a>
-        <div class="hat-ad-label">Sponsored · ${ad.title}</div>
+        <div class="hat-ad-label">${ad.title}</div>
       </div>
     `
       )

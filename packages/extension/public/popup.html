@@ -3,29 +3,283 @@
 <head>
   <meta charset="UTF-8" />
   <style>
-    body { width: 320px; padding: 16px; font-family: system-ui, sans-serif; }
-    h1 { font-size: 18px; margin: 0 0 12px; }
-    .stats { background: #f5f5f5; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
-    .stat { display: flex; justify-content: space-between; margin: 4px 0; }
-    .btn { width: 100%; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
-    .btn-primary { background: #6366f1; color: white; }
-    .btn-secondary { background: #e5e7eb; color: #374151; margin-top: 8px; }
-    #status { text-align: center; color: #6b7280; font-size: 12px; margin-top: 8px; }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    * { box-sizing: border-box; margin: 0; }
+
+    body {
+      width: 360px;
+      padding: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f0b2e;
+      color: #e0e7ff;
+      overflow: hidden;
+    }
+
+    /* ── Liquid glass background ──────────────── */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .bg .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.4;
+    }
+    .bg .orb-1 { width: 200px; height: 200px; background: #6366f1; top: -60px; left: -40px; }
+    .bg .orb-2 { width: 160px; height: 160px; background: #fb7185; bottom: -40px; right: -30px; }
+    .bg .orb-3 { width: 120px; height: 120px; background: #fbbf24; top: 50%; left: 60%; opacity: 0.25; }
+
+    .content { position: relative; z-index: 1; }
+
+    /* ── Header ───────────────────────────────── */
+    .header {
+      padding: 20px 22px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .header-logo img { border-radius: 6px; }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 30%, #c7d2fe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header .tag {
+      margin-left: auto;
+      font-size: 10px;
+      font-weight: 600;
+      color: #fbbf24;
+      background: rgba(251,191,36,0.12);
+      border: 1px solid rgba(251,191,36,0.2);
+      padding: 3px 9px;
+      border-radius: 100px;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Body ─────────────────────────────────── */
+    .body { padding: 0 18px 20px; }
+
+    /* ── Glass card ───────────────────────────── */
+    .glass {
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+    }
+
+    /* ── Stats grid ──────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      border-radius: 2px 2px 0 0;
+    }
+    .stat:nth-child(1)::after { background: linear-gradient(90deg, #fbbf24, transparent); }
+    .stat:nth-child(2)::after { background: linear-gradient(90deg, #6366f1, transparent); }
+
+    .stat .label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .stat .value {
+      font-size: 22px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff, #c7d2fe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* ── Status card ──────────────────────────── */
+    .status-card {
+      grid-column: 1 / -1;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .status-card .label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-value {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #fb7185;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    .status-dot.verified { background: #22c55e; }
+    .status-value span {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* ── Buttons ──────────────────────────────── */
+    .btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #818cf8 0%, #6366f1 40%, #4f46e5 100%);
+      color: white;
+      margin-bottom: 10px;
+      box-shadow:
+        0 4px 16px rgba(99,102,241,0.3),
+        inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .btn-primary:hover {
+      box-shadow:
+        0 6px 24px rgba(99,102,241,0.4),
+        inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 50%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.12), transparent);
+      border-radius: 14px 14px 0 0;
+      pointer-events: none;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #c7d2fe;
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    #status {
+      text-align: center;
+      color: rgba(255,255,255,0.35);
+      font-size: 11px;
+      margin-top: 12px;
+    }
+
+    /* ── Divider ──────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+      margin: 14px 0;
+    }
   </style>
 </head>
 <body>
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-    <img src="icons/icon-48.png" width="32" height="32" alt="HAT" style="border-radius:6px"/>
-    <h1 style="margin:0">HAT</h1>
+  <!-- Liquid glass background orbs -->
+  <div class="bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
   </div>
-  <div class="stats">
-    <div class="stat"><span>HAT Earned</span><span id="hat-earned">0</span></div>
-    <div class="stat"><span>USDC Earned</span><span id="usdc-earned">$0.00</span></div>
-    <div class="stat"><span>Status</span><span id="verified-status">Not Verified</span></div>
+
+  <div class="content">
+    <div class="header">
+      <div class="header-logo">
+        <img src="icons/icon-48.png" width="24" height="24" alt="HAT" />
+      </div>
+      <h1>HAT</h1>
+      <span class="tag">BETA</span>
+    </div>
+
+    <div class="body">
+      <div class="stats">
+        <div class="stat glass">
+          <div class="label">HAT Earned</div>
+          <div class="value" id="hat-earned">0</div>
+        </div>
+        <div class="stat glass">
+          <div class="label">USDC Earned</div>
+          <div class="value" id="usdc-earned">$0.00</div>
+        </div>
+        <div class="status-card glass">
+          <div class="label">Status</div>
+          <div class="status-value">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="verified-status">Not Verified</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="verify-btn">Verify with World ID</button>
+      <button class="btn btn-secondary" id="connect-btn">Connect Wallet</button>
+      <div id="status"></div>
+    </div>
   </div>
-  <button class="btn btn-primary" id="verify-btn">Verify with World ID</button>
-  <button class="btn btn-secondary" id="connect-btn">Connect Wallet</button>
-  <div id="status"></div>
+
   <script src="popup.js"></script>
 </body>
 </html>
