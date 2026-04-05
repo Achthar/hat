@@ -1,166 +1,164 @@
 # HAT — Human Attention Token
 
-A verified human attention marketplace on **Arc**, Circle's purpose-built L1 blockchain. Users earn **USDC nanopayments** for viewing ads, with bonus **HAT tokens** as an incentive layer on top.
+**The middleman-free ad network where advertisers pay humans directly for their attention.**
 
-Powered by **Circle Gateway nanopayments**, **World ID 4.0** proof-of-human, and **Arc's USDC-native gas**.
+No ad networks. No upfront budgets. No bots. Just verified humans earning USDC micropayments for every second of attention — settled gaslessly on Arc.
+
+---
+
+## The Problem
+
+Online advertising is broken:
+
+- **Advertisers** overpay for impressions that are 40%+ bots, with ad networks taking 30-70% as middlemen
+- **Users** get tracked, profiled, and shown irrelevant ads with zero compensation
+- **Publishers** depend on opaque ad networks that dictate rates and delay payments
+
+## The Solution
+
+HAT removes the middleman entirely. Advertisers deposit USDC and set their own rates. Verified humans earn micropayments directly — per second of attention, per click-through. No minimums, no invoicing, no fraud.
+
+| Traditional Ads | HAT |
+|---|---|
+| Pay ad network upfront | Pay per second/click as it happens |
+| 40%+ bot traffic | World ID proof-of-human, zero bots |
+| Ad network takes 30-70% | Direct advertiser → viewer payments |
+| Monthly invoices, NET-30 | Gas-free USDC nanopayments, settled every 2 minutes |
+| Users get nothing | Users earn USDC + HAT tokens |
 
 ---
 
 ## How It Works
 
+### For Viewers
+
+1. **Install** the HAT browser extension
+2. **Verify humanity** with World ID (one-time orb scan)
+3. **Browse normally** — the extension shows relevant ads in a sidebar and replaces existing ads
+4. **Earn USDC** for every second of verified attention + bonus HAT tokens
+5. Payments settle automatically — no claiming, no gas fees
+
+### For Advertisers
+
+1. **Connect wallet** on the advertiser dashboard
+2. **Create a campaign** — set a banner, target URL, budget, and your own rates:
+   - View rate (USDC per second of attention)
+   - Click-through bonus (USDC per click)
+3. **Deposit USDC** on Arc — funds the nanopayment pool
+4. **Track performance** in real-time — views, clicks, CTR, spend breakdown per campaign
+5. **Pause, resume, or withdraw** remaining funds at any time
+
+### Settlement
+
+Every 2 minutes, the platform settles all accrued earnings:
+
 ```
- Advertiser                    Platform (Arc)                  Viewer
- ──────────                    ──────────────                  ──────
-     │                              │                              │
-     │  1. Fund Gateway Wallet      │                              │
-     │  ───────────────────────►    │                              │
-     │  (native USDC on Arc)        │                              │
-     │                              │                              │
-     │  2. Create Campaign          │                              │
-     │  ───────────────────────►    │                              │
-     │  (title, banner, budget)     │                              │
-     │                              │                              │
-     │                              │    3. Verify Humanity        │
-     │                              │    ◄─────────────────────    │
-     │                              │    (World ID orb proof)      │
-     │                              │                              │
-     │                              │    4. View Ads (extension)   │
-     │                              │    ◄─────────────────────    │
-     │                              │    IntersectionObserver +    │
-     │                              │    15s heartbeats            │
-     │                              │                              │
-     │                              │    5. USDC Nanopayment       │
-     │                              │    ─────────────────────►    │
-     │                              │    EIP-3009 signed offchain  │
-     │                              │    (gas-free, via Gateway)   │
-     │                              │                              │
-     │                              │    6. HAT Bonus Mint         │
-     │                              │    ─────────────────────►    │
-     │                              │    batchMint on-chain        │
-     │                              │    (incentive layer)         │
+Viewer watches ad for 60 seconds at $0.0001/sec
+  → Earns $0.006 USDC (gasless nanopayment)
+  → Earns 60 HAT bonus tokens
+
+Viewer clicks through to advertiser's site
+  → Earns click bonus (set by advertiser, e.g. $0.01)
+  → Earns 100 HAT bonus tokens
 ```
+
+Payments are signed offchain (EIP-3009) and batched by Circle's Gateway — **zero gas cost per payment**.
 
 ---
 
-## USDC Nanopayment Flow (Circle Gateway)
+## Key Design Principles
 
-HAT uses Circle's **x402-based nanopayments** for gas-free USDC micropayments on Arc Testnet.
+### No Middlemen
 
-### 1. Advertiser Deposits USDC
+Advertisers create campaigns and fund them directly. Viewers earn directly. There is no ad network taking a cut, no auction system inflating prices, no opaque algorithms deciding who sees what.
 
-Advertisers send native USDC (Arc's gas token) to the platform's Gateway wallet. This funds the nanopayment pool for their campaigns.
+### No Upfront Commitment
 
-### 2. Offchain Payment Signing (EIP-3009)
+Micropayments mean advertisers pay exactly for what they get — $0.0001 per second of verified human attention. No minimum spend, no prepaid blocks of impressions, no wasted budget on unverified traffic.
 
-When a verified view session ends, the backend signs an **EIP-3009 `TransferWithAuthorization`** — an offchain signature authorizing USDC transfer from the Gateway wallet to the viewer. **Zero gas required.**
+### No Bots
 
-```
-Platform Wallet  ──[sign offchain]──►  EIP-3009 Authorization
-                                           │
-                                           ▼
-                                    Circle Gateway API
-                                    POST /gateway/v1/x402/settle
-                                           │
-                                           ▼
-                                    Funds locked instantly
-                                    (viewer credited)
-```
+Every viewer must verify their humanity through **World ID 4.0** (orb-level biometric verification). The nullifier system ensures one person = one account. Bot farms can't fake orb scans.
 
-### 3. Batched On-Chain Settlement
+### No Gas Fees
 
-Circle's Gateway collects signed authorizations and settles them in a **single batched on-chain transaction**. Gas is absorbed by Circle, making the per-payment cost effectively zero.
-
-### 4. HAT Token Bonus (On-Chain)
-
-HAT tokens are minted proportionally to USDC earned:
-
-```
-HAT earned = USDC earned × 10,000
-```
-
-At $0.0001/sec USDC rate, this equals ~1 HAT/sec — an incentive to keep viewing. HAT is minted via `HATToken.batchMint()` in the same settlement cycle.
+Arc is Circle's L1 where **USDC is the native gas token**. Combined with Circle Gateway's batched settlement, individual micropayments cost $0 in gas. Circle absorbs all settlement costs.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│ Browser Extension│────▶│  Backend (API)   │────▶│  Arc Chain      │
-│ - Ad sidebar     │     │  - World ID v4   │     │  - Gateway      │
-│ - Ad replacement │     │  - View metering │     │    nanopayments │
-│ - View tracking  │     │  - Nanopayment   │     │  - HATToken     │
-│ - Heartbeat      │     │    settlement    │     │  - PayoutVault  │
-└─────────────────┘     │  - SQLite DB     │     │    (fallback)   │
-                        └──────────────────┘     └─────────────────┘
-┌─────────────────┐              │
-│ Demo Frontend   │──────────────┘
-│ - Wallet connect│
-│ - World ID flow │
-└─────────────────┘
-┌─────────────────┐              │
-│ Advertiser UI   │──────────────┘
-│ - Gateway fund  │
-│ - Campaign mgmt │
-└─────────────────┘
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│ Browser Extension │────▶│  Backend (API)   │────▶│  Arc Blockchain  │
+│                  │     │                  │     │                  │
+│ Ad sidebar       │     │ World ID v4      │     │ USDC nanopayments│
+│ Ad replacement   │     │ View metering    │     │ (Circle Gateway) │
+│ View tracking    │     │ Click tracking   │     │                  │
+│ Click reporting  │     │ Settlement cron  │     │ HATToken ERC-20  │
+│ Earnings display │     │ Analytics        │     │ (batch mint)     │
+└──────────────────┘     │ D1 (SQLite)      │     │                  │
+                         └──────────────────┘     └──────────────────┘
+┌──────────────────┐              │
+│ Viewer Frontend  │──────────────┘
+│ World ID verify  │
+│ Earnings stats   │
+└──────────────────┘
+┌──────────────────┐              │
+│ Advertiser UI    │──────────────┘
+│ Campaign CRUD    │
+│ Deposit/Withdraw │
+│ Live analytics   │
+└──────────────────┘
 ```
 
-## Packages
+## Tech Stack
 
-| Package | Tech | Port | Description |
-|---|---|---|---|
-| `packages/common` | TypeScript | — | Shared types, ABIs, constants, chain config |
-| `packages/contracts` | Solidity + Foundry | — | HATToken (batch mint) + PayoutVault (USDC escrow, fallback) |
-| `packages/backend` | Hono + Cloudflare Workers + D1 | 3001 | World ID v4, view metering, nanopayment settlement |
-| `packages/extension` | TypeScript + Vite (Chrome MV3) | — | Ad sidebar, ad replacement, view tracking w/ heartbeat |
-| `packages/web` | React + Vite | 3000 | Demo site + World ID verify page + wallet connect |
-| `packages/advertiser` | React + Vite | 3002 | Campaign management + Gateway wallet funding |
-
-## Key Technologies
-
-| Layer | Technology |
-|-------|-----------|
-| **Payments** | Circle Gateway nanopayments (x402 + EIP-3009) |
-| **Blockchain** | Arc Testnet (chain ID 5042002, USDC-native gas) |
-| **Identity** | World ID 4.0 (orb-level proof-of-human) |
-| **Backend** | Hono on Cloudflare Workers + D1 (SQLite) |
-| **Frontend** | React 19 + Vite |
-| **Extension** | Chrome Manifest V3 |
-
-## Payment Rates
-
-| Metric | Rate |
-|--------|------|
-| USDC per second | $0.0001 (~$0.36/hr) |
-| HAT per USDC | 10,000 HAT / $1 |
-| HAT per second | ~1 HAT/sec (derived from USDC) |
-| Platform fee | 2.5% (250 bps) |
-| Nanopayment gas cost | $0 (Circle-sponsored batch settlement) |
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| **Payments** | Circle Gateway nanopayments (EIP-3009) | Gas-free USDC micropayments, batched settlement |
+| **Blockchain** | Arc Testnet (chain 5042002) | USDC-native gas, sub-second finality |
+| **Identity** | World ID 4.0 (orb verification) | Proof-of-human, prevents bot fraud |
+| **Backend** | Hono + Cloudflare Workers + D1 | Edge-deployed, auto-scaling, cron settlement |
+| **Extension** | Chrome Manifest V3 | Ad detection, view tracking, earnings display |
+| **Frontend** | React 19 + Vite | Viewer dashboard + advertiser console |
+| **Contracts** | Solidity + Foundry | HATToken ERC-20 with batch mint |
 
 ---
 
-## What's Implemented
+## Nanopayment Flow
 
-- [x] pnpm monorepo with 6 packages
-- [x] **Circle Gateway nanopayments** — EIP-3009 offchain signing + batched settlement (gas-free USDC micropayments)
-- [x] **HATToken.sol** — ERC-20 with `batchMint()` for gas-efficient multi-recipient minting (incentive layer)
-- [x] **PayoutVault.sol** — advertiser USDC escrow, batch distribute (fallback / smart contract prize)
-- [x] Foundry tests (5/5 passing) + Arc testnet deploy script
-- [x] Backend with D1 persistence — users, view sessions, ads, settlements
-- [x] World ID v4 verification with nullifier uniqueness
-- [x] Nanopayment settlement — signs EIP-3009 per viewer, submits to Gateway, then batch mints HAT
-- [x] Browser extension — ad sidebar, IntersectionObserver tracking, heartbeat, earnings display
-- [x] Advertiser Gateway funding flow (native USDC send on Arc)
-- [x] Gateway status endpoint (`/api/nanopayments/status`)
-- [x] USDC-primary UI — USDC is the main earning metric, HAT shown as bonus
-- [x] Dev mode: seed data, mock verification, settlement without on-chain
+```
+Advertiser deposits USDC on Arc
+        │
+        ▼
+Viewer watches ad (tracked by extension)
+        │
+        ▼
+Backend calculates: $0.0001/sec × duration + click bonus
+        │
+        ▼
+Platform signs EIP-3009 TransferWithAuthorization (offchain, $0 gas)
+        │
+        ▼
+Submitted to Circle Gateway settle API
+        │
+        ▼
+Circle batches all payments into 1 on-chain tx (Circle pays gas)
+        │
+        ▼
+Viewer receives USDC + HAT tokens minted as bonus
+```
 
-## What's Left
+## Advertiser Analytics
 
-- [ ] Deploy HATToken contract to Arc testnet
-- [ ] Fill contract address in `packages/common/src/constants.ts`
-- [ ] Fund platform Gateway wallet with USDC for nanopayment settlement
-- [ ] Video demo + architecture diagram for submission
+Each campaign tracks in real-time:
+- **Views** / **Unique viewers** / **Average view duration**
+- **Clicks** / **CTR%**
+- **Spend breakdown**: view attention USDC vs click-through USDC
+- **Cost metrics**: per view, per click, per unique viewer, per second
+
+Advertisers can pause/resume campaigns and withdraw unspent USDC at any time.
 
 ---
 
@@ -168,68 +166,45 @@ At $0.0001/sec USDC rate, this equals ~1 HAT/sec — an incentive to keep viewin
 
 ```bash
 pnpm install
-
-# Build shared types
 pnpm --filter @hat/common build
 
-# Contracts (requires Foundry)
-cd packages/contracts
-forge install openzeppelin/openzeppelin-contracts foundry-rs/forge-std --no-git
-forge test
-
-# Start everything
+# Start locally
 pnpm dev
 # web:        http://localhost:3000
 # backend:    http://localhost:3001
 # advertiser: http://localhost:3002
 
-# Seed demo ads for local testing
-curl -X POST http://localhost:3001/api/dev/seed
-
-# Build extension, then load dist/ as unpacked in chrome://extensions
+# Build + load extension in chrome://extensions
 pnpm --filter @hat/extension build
 ```
 
-### Environment Variables (backend)
+### Environment
 
 ```env
-WORLD_ID_RP_ID=app_...
-WORLD_ID_SIGNING_KEY=...
-DEPLOYER_PRIVATE_KEY=0x...       # For HATToken minting
-ARC_RPC_URL=https://testnet-rpc.arc.circle.com
-GATEWAY_PRIVATE_KEY=0x...        # Platform wallet for nanopayments
+# Backend (Cloudflare Workers secrets)
+WORLD_ID_RP_ID=rp_...
+WORLD_ID_APP_ID=app_...
+WORLD_ID_SIGNING_KEY=0x...
+GATEWAY_PRIVATE_KEY=0x...
+GATEWAY_WALLET_ADDRESS=0x0077777d7EBA4688BDeF3E311b846F25870A19B9
+
+# Frontend
+VITE_WORLD_ID_APP_ID=app_...
 ```
 
-### API Endpoints
+---
 
-| Endpoint | Description |
+## Packages
+
+| Package | Description |
 |---|---|
-| `GET /api/nanopayments/status` | Gateway wallet status + balance |
-| `POST /api/settlement/batch` | Trigger nanopayment settlement + HAT mint |
-| `GET /api/settlement/history` | Settlement history |
-| `POST /api/views/start` | Start ad view session |
-| `POST /api/views/end` | End session, calculate USDC + HAT |
-| `POST /api/dev/seed` | Seed demo ads |
-| `POST /api/dev/mock-verify` | Mock-verify a user (skip World ID) |
+| `packages/common` | Shared types, ABIs, constants |
+| `packages/contracts` | HATToken + PayoutVault (Solidity/Foundry) |
+| `packages/backend` | API server, settlement, nanopayments (Cloudflare Workers) |
+| `packages/web` | Viewer site — World ID verify, earnings dashboard |
+| `packages/advertiser` | Advertiser console — campaigns, deposits, analytics |
+| `packages/extension` | Chrome extension — ad sidebar, view tracking, earnings |
 
 ---
 
-## Flow
-
-1. **User** connects wallet on demo site, verifies humanity via World ID 4.0
-2. **Advertiser** connects wallet, creates campaign, funds Gateway wallet with native USDC on Arc
-3. **Extension** fetches active ads, injects sidebar + replaces existing ads, tracks view time via IntersectionObserver + heartbeat
-4. **Backend** records view sessions in D1, calculates `usdcEarned` (primary) and `hatEarned = usdcEarned * 10,000` (bonus)
-5. **Settlement** signs EIP-3009 nanopayments per viewer (gas-free via Gateway) + batch mints HAT tokens on-chain
-
----
-
-## Bounty: Best Agentic Economy with Nanopayments ($6,000)
-
-HAT demonstrates:
-
-- **Automated content monetization** — viewers earn $0.0001/sec USDC for verified ad attention
-- **Gas-free nanopayments** — EIP-3009 offchain signing + Circle Gateway batch settlement
-- **Autonomous agent behavior** — the browser extension acts as an agent: detects ads, tracks attention via IntersectionObserver, triggers payments without human intervention
-- **Proof-of-human gating** — World ID 4.0 ensures only verified humans earn, preventing bot fraud
-- **Incentive stacking** — HAT bonus tokens on top of USDC create dual incentive alignment
+*Built for the Arc hackathon — Best Agentic Economy with Nanopayments*

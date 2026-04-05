@@ -4,7 +4,7 @@ export const ARC_TESTNET_RPC = "https://rpc.testnet.arc.network";
 // Placeholder — fill after deployment
 export const CONTRACTS = {
   PAYOUT_VAULT: "" as `0x${string}`,
-  HAT_TOKEN: "" as `0x${string}`,
+  HAT_TOKEN: "0x272810659671C4C2e51E903D0675913022edF2e6" as `0x${string}`,
   USDC: "" as `0x${string}`,
 } as const;
 

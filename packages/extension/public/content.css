@@ -1,4 +1,4 @@
-/* ── HAT Ad Sidebar — Liquid Glass ────────────────────────── */
+/* ── HAT Ad Sidebar ──────────────────────────────────────── */
 
 #hat-sidebar {
   position: fixed;
@@ -6,15 +6,13 @@
   right: 0;
   width: 300px;
   height: 100vh;
-  background: rgba(15, 11, 46, 0.82);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0f0b2e;
+  border-left: 1px solid rgba(99, 102, 241, 0.15);
   z-index: 999999;
   overflow-y: auto;
   font-family: system-ui, -apple-system, sans-serif;
   color: #e0e7ff;
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.25);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
   transition: width 0.3s ease, height 0.3s ease;
 }
 
@@ -25,10 +23,10 @@
   height: auto;
   top: 8px;
   right: 8px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  border: 1px solid rgba(99, 102, 241, 0.2);
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 #hat-sidebar.hat-collapsed .hat-sidebar-body {
@@ -43,43 +41,92 @@ body.hat-collapsed-active {
 #hat-sidebar::-webkit-scrollbar { width: 4px; }
 #hat-sidebar::-webkit-scrollbar-track { background: transparent; }
 #hat-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(99, 102, 241, 0.3);
   border-radius: 4px;
 }
 
 /* ── Header ──────────────────────────────────────────────── */
 
 #hat-sidebar .hat-header {
-  padding: 16px 18px;
-  background: linear-gradient(135deg,
-    rgba(99, 102, 241, 0.3),
-    rgba(79, 70, 229, 0.2));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  font-weight: 700;
-  font-size: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.2);
   display: flex;
   justify-content: space-between;
   align-items: center;
   position: sticky;
   top: 0;
   z-index: 1;
+  gap: 10px;
 }
 
-#hat-sidebar .hat-header span:first-child {
-  background: linear-gradient(135deg, #fff 30%, #c7d2fe);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+#hat-sidebar .hat-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+#hat-sidebar .hat-logo-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 14px;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  flex-shrink: 0;
+}
+
+#hat-sidebar .hat-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+#hat-sidebar .hat-header-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+#hat-sidebar .hat-header-sub {
+  font-size: 10px;
+  font-weight: 500;
+  color: #a5b4fc;
+  letter-spacing: 0.01em;
+}
+
+#hat-sidebar .hat-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#hat-sidebar .hat-earnings-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  padding: 4px 10px;
+  border-radius: 100px;
+  white-space: nowrap;
 }
 
 #hat-sidebar .hat-toggle {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.6);
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #a5b4fc;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   font-size: 10px;
   cursor: pointer;
   display: flex;
@@ -92,16 +139,16 @@ body.hat-collapsed-active {
 }
 
 #hat-sidebar .hat-toggle:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(99, 102, 241, 0.3);
   color: #fff;
 }
 
 /* ── Earnings bar ────────────────────────────────────────── */
 
 #hat-sidebar .hat-earnings {
-  padding: 14px 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 12px 18px;
+  background: rgba(99, 102, 241, 0.06);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
   font-size: 12px;
   font-weight: 600;
   color: #fbbf24;
@@ -127,12 +174,12 @@ body.hat-collapsed-active {
 
 #hat-sidebar .hat-ad-slot {
   padding: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.08);
   transition: background 0.2s;
 }
 
 #hat-sidebar .hat-ad-slot:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(99, 102, 241, 0.04);
 }
 
 #hat-sidebar .hat-ad-slot a {
@@ -148,7 +195,7 @@ body.hat-collapsed-active {
   position: absolute;
   inset: 0;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.1);
   pointer-events: none;
 }
 
@@ -169,11 +216,12 @@ body.hat-collapsed-active {
 
 #hat-sidebar .hat-ad-label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: #a5b4fc;
   margin-top: 8px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  font-weight: 500;
 }
 
 #hat-sidebar .hat-ad-label::before {
