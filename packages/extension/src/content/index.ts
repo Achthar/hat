@@ -799,11 +799,15 @@ window.addEventListener("message", (event) => {
     });
   }
   if (event.data?.type === "HAT_WORLD_ID_VERIFIED" && event.data.address) {
-    chrome.storage.local.set({
-      userId: event.data.address,
-      walletAddress: event.data.address,
-      verified: true,
-      nullifier: event.data.nullifier,
+    // Keep the existing walletAddress if we already have one (from wallet connection)
+    chrome.storage.local.get("walletAddress", (stored) => {
+      const addr = stored.walletAddress || event.data.address;
+      chrome.storage.local.set({
+        userId: addr,
+        walletAddress: addr,
+        verified: true,
+        nullifier: event.data.nullifier,
+      });
     });
   }
 });

@@ -97,25 +97,26 @@ authRoutes.post("/verify-world-id", async (c) => {
     return c.json({ error: "No nullifier in verification response", response: result }, 400);
   }
 
+  // Always use the provided wallet address if available
+  const resolvedAddress = address || nullifier;
+
   const existing = await db.getUserByNullifier(c.env.DB, nullifier);
   if (existing) {
-    // Already verified — return existing account (allows re-login)
-    const user = existing;
+    // Return the wallet address the user provided (not the stored one)
     return c.json({
       verified: true,
       nullifier,
-      address: user.address as string,
-      totalHatEarned: user.total_hat_earned ?? 0,
-      totalUsdcEarned: user.total_usdc_earned ?? 0,
+      address: address || (existing.address as string),
+      totalHatEarned: existing.total_hat_earned ?? 0,
+      totalUsdcEarned: existing.total_usdc_earned ?? 0,
     });
   }
 
-  // Use provided wallet address, or fall back to nullifier as identity
-  const userId = address || nullifier;
-  await db.upsertUser(c.env.DB, userId);
-  await db.verifyUser(c.env.DB, nullifier, userId);
+  // New user
+  await db.upsertUser(c.env.DB, resolvedAddress);
+  await db.verifyUser(c.env.DB, nullifier, resolvedAddress);
 
-  return c.json({ verified: true, nullifier, address: userId });
+  return c.json({ verified: true, nullifier, address: resolvedAddress });
 });
 
 /// Link a wallet address to an existing World ID-verified account
