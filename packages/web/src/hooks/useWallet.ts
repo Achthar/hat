@@ -45,6 +45,15 @@ export function useWallet() {
         totalHatEarned: data.totalHatEarned ?? 0,
         totalUsdcEarned: data.totalUsdcEarned ?? 0,
       });
+
+      // Notify extension of wallet connection
+      try {
+        window.postMessage({
+          type: "HAT_WALLET_CONNECTED",
+          address,
+          verified: data.verified,
+        }, "*");
+      } catch { /* not in extension context */ }
     } catch {
       setUser((prev) => ({ ...prev, address }));
     }

@@ -8,7 +8,7 @@ chrome.runtime.onInstalled.addListener(() => {
 // Listen for messages from popup/content scripts
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "GET_STATUS") {
-    chrome.storage.local.get(["verified", "hatEarned", "usdcEarned", "userId"], (data) => {
+    chrome.storage.local.get(["verified", "hatEarned", "usdcEarned", "userId", "walletAddress"], (data) => {
       sendResponse(data);
     });
     return true; // async response
@@ -36,6 +36,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "DISCONNECT") {
     chrome.storage.local.set({
       userId: "anonymous",
+      walletAddress: null,
       verified: false,
       nullifier: null,
       hatEarned: 0,
@@ -53,6 +54,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         // Address changed — reset state for the new account
         chrome.storage.local.set({
           userId: newAddress,
+          walletAddress: newAddress,
           verified: false,
           nullifier: null,
           hatEarned: 0,

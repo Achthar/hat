@@ -43,6 +43,7 @@ function showDisconnected() {
 
 function showConnected(data: {
   userId: string;
+  walletAddress?: string;
   verified?: boolean;
   hatEarned?: number;
   usdcEarned?: number;
@@ -50,11 +51,11 @@ function showConnected(data: {
   viewDisconnected.classList.add("hidden");
   viewConnected.classList.remove("hidden");
 
-  // Show address (truncated, clickable to copy)
-  const id = data.userId;
-  walletAddr.innerHTML = `${id.slice(0, 6)}...${id.slice(-4)}<span class="copy-hint">copy</span>`;
-  walletAddr.title = id;
-  walletAddr.dataset.fullAddress = id;
+  // Prefer wallet address over nullifier/userId for display + copy
+  const displayAddr = data.walletAddress || data.userId;
+  walletAddr.innerHTML = `${displayAddr.slice(0, 6)}...${displayAddr.slice(-4)}<span class="copy-hint">copy</span>`;
+  walletAddr.title = displayAddr;
+  walletAddr.dataset.fullAddress = displayAddr;
 
   // Earnings
   hatEarnedEl.textContent = String(Math.floor(data.hatEarned || 0));
@@ -79,7 +80,7 @@ function showConnected(data: {
   }
 
   // Show "Connect Wallet for Payouts" if logged in via nullifier (no real wallet)
-  if (isNullifierId(id)) {
+  if (isNullifierId(data.userId)) {
     linkWalletBtn.classList.remove("hidden");
   } else {
     linkWalletBtn.classList.add("hidden");
@@ -126,6 +127,7 @@ function loadState() {
     if (live) {
       showConnected({
         userId: data.userId,
+        walletAddress: data.walletAddress,
         verified: live.verified,
         hatEarned: live.totalHatEarned,
         usdcEarned: live.totalUsdcEarned,
@@ -178,11 +180,12 @@ async function connectWallet() {
       });
     } catch {}
 
-    chrome.storage.local.set({ userId: address });
+    chrome.storage.local.set({ userId: address, walletAddress: address });
 
     const live = await fetchLiveStats(address);
     showConnected({
       userId: address,
+      walletAddress: address,
       verified: live?.verified ?? false,
       hatEarned: live?.totalHatEarned ?? 0,
       usdcEarned: live?.totalUsdcEarned ?? 0,
@@ -239,12 +242,13 @@ async function linkWallet() {
         });
       } catch {}
 
-      // Update stored userId to the real wallet address
-      chrome.storage.local.set({ userId: address });
+      // Update stored userId and walletAddress to the real wallet address
+      chrome.storage.local.set({ userId: address, walletAddress: address });
 
       const live = await fetchLiveStats(address);
       showConnected({
         userId: address,
+        walletAddress: address,
         verified: live?.verified ?? true,
         hatEarned: live?.totalHatEarned ?? 0,
         usdcEarned: live?.totalUsdcEarned ?? 0,
@@ -294,9 +298,65 @@ walletAddr.addEventListener("click", () => {
   });
 });
 
+// ── Auto-link wallet if already connected ────────────────────
+
+async function autoLinkWallet() {
+  // Check if we already have a walletAddress stored
+  chrome.storage.local.get(["userId", "walletAddress"], async (data) => {
+    if (!data.userId || data.userId === "anonymous") return;
+    if (data.walletAddress) return; // already linked
+
+    // Try to read the connected account from the active tab's injected wallet
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
+
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          const eth = (window as unknown as { ethereum?: { request: (a: { method: string }) => Promise<string[]> } }).ethereum;
+          if (!eth) return null;
+          // eth_accounts doesn't prompt — just returns already-connected accounts
+          return eth.request({ method: "eth_accounts" })
+            .then((accounts: string[]) => accounts[0] || null)
+            .catch(() => null);
+        },
+      });
+
+      const address = results?.[0]?.result as string | null;
+      if (!address) return;
+
+      // Store it and link on backend
+      chrome.storage.local.set({ walletAddress: address });
+
+      // If userId is a nullifier, link it on the backend too
+      if (isNullifierId(data.userId)) {
+        chrome.storage.local.get("nullifier", async (stored) => {
+          if (stored.nullifier) {
+            try {
+              await fetch(`${API_BASE}/auth/link-wallet`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nullifier: stored.nullifier, address }),
+              });
+              chrome.storage.local.set({ userId: address, walletAddress: address });
+            } catch {}
+          }
+        });
+      }
+
+      // Refresh display
+      loadState();
+    } catch {
+      // scripting permission may not be available
+    }
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", () => {
   loadState();
+  autoLinkWallet();
   setInterval(loadState, 10_000);
 });

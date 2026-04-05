@@ -789,11 +789,19 @@ function checkAuthAndActivate() {
   });
 }
 
-// Listen for World ID verification messages from the web app
+// Listen for messages from the web app (wallet connection + World ID verification)
 window.addEventListener("message", (event) => {
+  if (event.data?.type === "HAT_WALLET_CONNECTED" && event.data.address) {
+    // Store the wallet address immediately so earnings accrue to it
+    chrome.storage.local.set({
+      userId: event.data.address,
+      walletAddress: event.data.address,
+    });
+  }
   if (event.data?.type === "HAT_WORLD_ID_VERIFIED" && event.data.address) {
     chrome.storage.local.set({
       userId: event.data.address,
+      walletAddress: event.data.address,
       verified: true,
       nullifier: event.data.nullifier,
     });
