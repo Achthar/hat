@@ -26,10 +26,13 @@ type SlotShape = "standard" | "wide" | "tall";
 /** Classify a slot by its aspect ratio */
 function classifySlot(w: number, h: number): SlotShape {
   if (w <= 0 || h <= 0) return "standard";
+  // Very short slots — text strip only, image would be unreadable
+  if (h < 60) return "wide";
   const ratio = w / h;
-  if (ratio >= 3) return "wide";   // leaderboard-like (728x90 = 8:1, 320x50 = 6.4:1)
+  // Only use text strip for extreme leaderboard shapes (728x90, 320x50, 468x60)
+  if (ratio >= 5) return "wide";
   if (ratio <= 0.6) return "tall"; // skyscraper-like (160x600 = 0.27:1, 300x600 = 0.5:1)
-  return "standard";               // medium rectangle, square, etc.
+  return "standard";               // everything else gets an image with object-fit:cover
 }
 
 /** Pick the best image URL for a given slot shape */
@@ -254,6 +257,10 @@ const AD_SELECTORS = [
   'iframe[id*="tb-iframe"]',
   // Catch-all: any element with exact id "ad-container"
   "#ad-container",
+  // Sponsored links (Adform, affiliate networks)
+  'a[href*="adform.net"]',
+  'a[href*="adclick"]',
+  'a[rel*="sponsored"]',
 ];
 
 const COMBINED_SELECTOR = AD_SELECTORS.join(", ");
@@ -273,7 +280,7 @@ function isAdLikeIframe(el: HTMLIFrameElement): boolean {
   // data: URI iframes are almost always ads (inline ad content)
   if (src.startsWith("data:") && src.length > 200) return true;
   // Known ad network patterns in src
-  if (/ad[sx]?\.|banner|sponsor|promo|click|track|doubleclick|googlesyndication|adx\.ws|sevio/i.test(src)) return true;
+  if (/ad[sx]?\.|banner|sponsor|promo|click|track|doubleclick|googlesyndication|adx\.ws|sevio|adform\.net/i.test(src)) return true;
   // Check parent — if parent is an ad container, iframe is an ad
   const parent = el.parentElement;
   if (parent && parent.matches?.(COMBINED_SELECTOR)) return true;
@@ -335,34 +342,28 @@ function assignUniqueIndices(slotCount: number, adCount: number, avoid: number[]
   return result;
 }
 
-/** Native HTML strip for wide/leaderboard slots — text + logo, no image scaling issues */
+/** Native HTML strip for wide/leaderboard slots — thumbnail + text */
 function buildWideAdHtml(ad: Ad): string {
-  // Pick a color accent per ad for variety
-  const accents = ["#818cf8", "#fb7185", "#fbbf24"];
+  const accents = ["#6366f1", "#e11d48", "#d97706"];
   const accent = accents[Math.abs(hashStr(ad.id)) % accents.length];
   return `
     <a href="${ad.target_url}" target="_blank" rel="noopener"
-      style="display:flex;align-items:center;width:100%;height:100%;padding:0 16px;gap:12px;
-        text-decoration:none;border-radius:10px;overflow:hidden;">
-      <div style="flex-shrink:0;width:28px;height:28px;border-radius:8px;
-        background:linear-gradient(135deg,${accent},rgba(255,255,255,0.06));
-        display:flex;align-items:center;justify-content:center;
-        border:1px solid rgba(255,255,255,0.1);">
-        <span style="font-weight:900;font-size:11px;color:#fff;font-family:system-ui;">H</span>
-      </div>
+      style="display:flex;align-items:center;width:100%;height:100%;padding:0 10px;gap:10px;
+        text-decoration:none;border-radius:10px;overflow:hidden;background:#ffffff;">
+      <img src="${ad.image_url}" alt="${ad.title}"
+        style="flex-shrink:0;height:80%;max-height:100%;width:auto;object-fit:contain;border-radius:6px;" />
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:system-ui,-apple-system,sans-serif;">
+        <div style="font-size:13px;font-weight:700;color:#1e1b4b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:system-ui,-apple-system,sans-serif;">
           ${ad.title}
         </div>
       </div>
       <div style="flex-shrink:0;padding:6px 14px;border-radius:8px;
-        background:linear-gradient(135deg,${accent},rgba(255,255,255,0.05));
-        font-size:11px;font-weight:700;color:#fff;font-family:system-ui;white-space:nowrap;
-        border:1px solid rgba(255,255,255,0.08);">
+        background:${accent};
+        font-size:11px;font-weight:700;color:#fff;font-family:system-ui;white-space:nowrap;">
         Learn More
       </div>
-      <div style="flex-shrink:0;font-size:9px;color:rgba(255,255,255,0.3);font-family:system-ui;
-        padding-left:8px;border-left:1px solid rgba(255,255,255,0.06);white-space:nowrap;">
+      <div style="flex-shrink:0;font-size:9px;color:#9ca3af;font-family:system-ui;
+        padding-left:8px;border-left:1px solid #e5e7eb;white-space:nowrap;">
         HAT Ad
       </div>
     </a>
@@ -377,15 +378,15 @@ function buildAdHtml(ad: Ad, shape: SlotShape = "standard"): string {
   return `
     <a href="${ad.target_url}" target="_blank" rel="noopener"
       style="display:block;width:100%;height:100%;border-radius:12px;overflow:hidden;
-        background:rgba(255,255,255,0.07);">
+        background:#ffffff;">
       <img src="${imgSrc}" alt="${ad.title}"
-        style="width:100%;height:100%;object-fit:contain;transition:transform .2s,filter .2s;"
+        style="width:100%;height:100%;object-fit:contain;background:#ffffff;transition:transform .2s,filter .2s;"
         onmouseenter="this.style.transform='scale(1.02)';this.style.filter='brightness(1.05)'"
         onmouseleave="this.style.transform='none';this.style.filter='none'" />
     </a>
-    <div style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,0.7);
-      background:rgba(15,11,46,0.65);backdrop-filter:blur(8px);padding:3px 8px;border-radius:8px;
-      border:1px solid rgba(255,255,255,0.08);font-weight:500;">
+    <div style="position:absolute;bottom:6px;right:8px;font-size:10px;color:#6b7280;
+      background:rgba(255,255,255,0.9);backdrop-filter:blur(8px);padding:3px 8px;border-radius:8px;
+      border:1px solid #e5e7eb;font-weight:500;">
       HAT · ${ad.title}
     </div>
   `;
@@ -405,7 +406,7 @@ function createHatAd(ad: Ad, shape: SlotShape = "standard", matchedSize?: { widt
   container.style.cssText = `
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     overflow:hidden;border-radius:12px;border:1px solid rgba(99,102,241,0.15);
-    background:rgba(15,11,46,0.96);backdrop-filter:blur(8px);
+    background:#ffffff;
     box-shadow:0 2px 12px rgba(99,102,241,0.06);position:relative;
     transition:opacity ${CROSSFADE_MS}ms ease;
     ${matchedSize ? `width:${matchedSize.width};height:${matchedSize.height};` : "padding:12px;"}
