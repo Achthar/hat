@@ -65,16 +65,11 @@ export function Verify() {
   async function emergencyBypass() {
     setBypassLoading(true);
     try {
-      let addr = user.address;
+      const addr = user.address;
       if (!addr) {
-        if (!window.ethereum) { alert("Please install a wallet extension"); return; }
-        const accounts = (await window.ethereum.request({ method: "eth_requestAccounts" })) as string[];
-        addr = accounts[0];
-        await fetch(`${API_BASE}/auth/connect-wallet`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: addr }),
-        });
+        alert("Connect your wallet first");
+        setBypassLoading(false);
+        return;
       }
       const res = await fetch(`${API_BASE}/dev/mock-verify`, {
         method: "POST",

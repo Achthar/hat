@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@hat/common": "workspace:*",
+    "@reown/appkit": "^1.8.19",
+    "@reown/appkit-adapter-ethers": "^1.8.19",
     "@worldcoin/idkit": "^4.0.11",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
