@@ -23,6 +23,7 @@ const statusDot = document.getElementById("status-dot")!;
 const verifyBtn = document.getElementById("verify-btn")!;
 const linkWalletBtn = document.getElementById("link-wallet-btn")!;
 const statusEl = document.getElementById("status")!;
+const connectDivider = document.getElementById("connect-divider")!;
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -49,9 +50,11 @@ function showConnected(data: {
   viewDisconnected.classList.add("hidden");
   viewConnected.classList.remove("hidden");
 
-  // Show address (truncated)
+  // Show address (truncated, clickable to copy)
   const id = data.userId;
-  walletAddr.textContent = `${id.slice(0, 6)}...${id.slice(-4)}`;
+  walletAddr.innerHTML = `${id.slice(0, 6)}...${id.slice(-4)}<span class="copy-hint">copy</span>`;
+  walletAddr.title = id;
+  walletAddr.dataset.fullAddress = id;
 
   // Earnings
   hatEarnedEl.textContent = String(Math.floor(data.hatEarned || 0));
@@ -80,6 +83,13 @@ function showConnected(data: {
     linkWalletBtn.classList.remove("hidden");
   } else {
     linkWalletBtn.classList.add("hidden");
+  }
+
+  // If verified, hide the regular connect wallet option on the disconnected view
+  // (they should use World ID, not plain wallet connect)
+  if (data.verified) {
+    connectBtn.classList.add("hidden");
+    connectDivider.classList.add("hidden");
   }
 }
 
@@ -264,6 +274,23 @@ linkWalletBtn.addEventListener("click", linkWallet);
 disconnectBtn.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "DISCONNECT" }, () => {
     showDisconnected();
+  });
+});
+
+// Copy address to clipboard on click
+walletAddr.addEventListener("click", () => {
+  const addr = walletAddr.dataset.fullAddress;
+  if (!addr) return;
+  navigator.clipboard.writeText(addr).then(() => {
+    const hint = walletAddr.querySelector(".copy-hint") as HTMLElement;
+    if (hint) {
+      hint.textContent = "copied!";
+      hint.style.color = "#22c55e";
+      setTimeout(() => {
+        hint.textContent = "copy";
+        hint.style.color = "";
+      }, 1500);
+    }
   });
 });
 

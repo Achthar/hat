@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f0b2e"/>
+      <stop offset="50%" stop-color="#1a1145"/>
+      <stop offset="100%" stop-color="#0f0b2e"/>
+    </linearGradient>
+    <linearGradient id="accent1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="accent2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#fb7185"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+    <linearGradient id="coinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="glowLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#6366f1" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="20"/>
+    </filter>
+    <filter id="coinShadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="16" flood-color="#6366f1" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.04" stroke="#818cf8" stroke-width="0.5">
+    <line x1="0" y1="0" x2="0" y2="630"/><line x1="60" y1="0" x2="60" y2="630"/>
+    <line x1="120" y1="0" x2="120" y2="630"/><line x1="180" y1="0" x2="180" y2="630"/>
+    <line x1="240" y1="0" x2="240" y2="630"/><line x1="300" y1="0" x2="300" y2="630"/>
+    <line x1="360" y1="0" x2="360" y2="630"/><line x1="420" y1="0" x2="420" y2="630"/>
+    <line x1="480" y1="0" x2="480" y2="630"/><line x1="540" y1="0" x2="540" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/><line x1="660" y1="0" x2="660" y2="630"/>
+    <line x1="720" y1="0" x2="720" y2="630"/><line x1="780" y1="0" x2="780" y2="630"/>
+    <line x1="840" y1="0" x2="840" y2="630"/><line x1="900" y1="0" x2="900" y2="630"/>
+    <line x1="960" y1="0" x2="960" y2="630"/><line x1="1020" y1="0" x2="1020" y2="630"/>
+    <line x1="1080" y1="0" x2="1080" y2="630"/><line x1="1140" y1="0" x2="1140" y2="630"/>
+    <line x1="0" y1="60" x2="1200" y2="60"/><line x1="0" y1="120" x2="1200" y2="120"/>
+    <line x1="0" y1="180" x2="1200" y2="180"/><line x1="0" y1="240" x2="1200" y2="240"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/><line x1="0" y1="360" x2="1200" y2="360"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/><line x1="0" y1="480" x2="1200" y2="480"/>
+    <line x1="0" y1="540" x2="1200" y2="540"/>
+  </g>
+
+  <!-- Ambient glow orbs -->
+  <circle cx="200" cy="500" r="200" fill="#6366f1" opacity="0.06" filter="url(#softGlow)"/>
+  <circle cx="1000" cy="150" r="180" fill="#fb7185" opacity="0.04" filter="url(#softGlow)"/>
+  <circle cx="600" cy="315" r="250" fill="#4f46e5" opacity="0.05" filter="url(#softGlow)"/>
+
+  <!-- Decorative flow lines (payment paths) -->
+  <g opacity="0.15">
+    <path d="M 0,400 Q 200,350 400,380 T 800,340 T 1200,360" fill="none" stroke="#6366f1" stroke-width="1" stroke-dasharray="4,8"/>
+    <path d="M 0,420 Q 250,380 500,400 T 900,370 T 1200,390" fill="none" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,8"/>
+    <path d="M 0,440 Q 300,400 600,420 T 1000,390 T 1200,410" fill="none" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,8"/>
+  </g>
+
+  <!-- Small floating USDC dots (representing nanopayments) -->
+  <g opacity="0.3">
+    <circle cx="150" cy="200" r="3" fill="#22c55e"/><circle cx="180" cy="180" r="2" fill="#22c55e"/>
+    <circle cx="350" cy="150" r="2.5" fill="#fbbf24"/><circle cx="380" cy="170" r="1.5" fill="#fbbf24"/>
+    <circle cx="850" cy="450" r="3" fill="#22c55e"/><circle cx="880" cy="430" r="2" fill="#22c55e"/>
+    <circle cx="1050" cy="350" r="2.5" fill="#6366f1"/><circle cx="1080" cy="370" r="1.5" fill="#6366f1"/>
+    <circle cx="500" cy="520" r="2" fill="#fb7185"/><circle cx="700" cy="100" r="2.5" fill="#fbbf24"/>
+  </g>
+
+  <!-- HAT Coin (centered-right) -->
+  <g transform="translate(900, 240)" filter="url(#coinShadow)">
+    <circle cx="0" cy="0" r="120" fill="url(#coinGrad)"/>
+    <circle cx="0" cy="0" r="108" fill="none" stroke="#a5b4fc" stroke-width="2" opacity="0.4"/>
+    <circle cx="0" cy="0" r="100" fill="none" stroke="#a5b4fc" stroke-width="1" opacity="0.2"/>
+    <circle cx="-20" cy="-20" r="80" fill="white" opacity="0.06"/>
+    <!-- H -->
+    <g fill="#fb7185" opacity="0.85">
+      <rect x="-46" y="-44" width="12" height="88" rx="4"/>
+      <rect x="-46" y="-4" width="92" height="12" rx="4"/>
+      <rect x="34" y="-44" width="12" height="88" rx="4"/>
+    </g>
+    <!-- T -->
+    <g fill="#fbbf24" opacity="0.85">
+      <rect x="-46" y="-44" width="92" height="12" rx="4"/>
+      <rect x="-6" y="-44" width="12" height="88" rx="4"/>
+    </g>
+    <!-- A -->
+    <g fill="white" opacity="0.95">
+      <rect x="-46" y="-44" width="12" height="88" rx="4"/>
+      <rect x="34" y="-44" width="12" height="88" rx="4"/>
+      <rect x="-46" y="-44" width="92" height="12" rx="4"/>
+      <rect x="-46" y="-4" width="92" height="12" rx="4"/>
+    </g>
+  </g>
+
+  <!-- Main text -->
+  <g transform="translate(80, 180)">
+    <!-- HAT title -->
+    <text font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="72" font-weight="800" fill="white" letter-spacing="-1">
+      HAT
+    </text>
+
+    <!-- Tagline -->
+    <text y="55" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="22" fill="#a5b4fc" font-weight="500" letter-spacing="0.5">
+      Human Attention Token
+    </text>
+
+    <!-- Gradient divider -->
+    <rect y="80" width="320" height="2" rx="1" fill="url(#accent2)" opacity="0.6"/>
+
+    <!-- Description -->
+    <text y="115" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" fill="#e0e7ff" font-weight="400" opacity="0.9">
+      Earn USDC micropayments for your attention.
+    </text>
+    <text y="142" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" fill="#e0e7ff" font-weight="400" opacity="0.7">
+      No bots. No middlemen. Just humans getting paid.
+    </text>
+  </g>
+
+  <!-- Tech badges -->
+  <g transform="translate(80, 410)">
+    <!-- Arc badge -->
+    <rect x="0" y="0" width="130" height="36" rx="18" fill="white" opacity="0.08"/>
+    <rect x="0" y="0" width="130" height="36" rx="18" fill="none" stroke="white" stroke-width="0.5" opacity="0.15"/>
+    <circle cx="22" cy="18" r="8" fill="#6366f1" opacity="0.8"/>
+    <text x="38" y="23" font-family="system-ui" font-size="13" fill="#c7d2fe" font-weight="600">Arc Chain</text>
+
+    <!-- USDC badge -->
+    <rect x="145" y="0" width="200" height="36" rx="18" fill="white" opacity="0.08"/>
+    <rect x="145" y="0" width="200" height="36" rx="18" fill="none" stroke="white" stroke-width="0.5" opacity="0.15"/>
+    <circle cx="167" cy="18" r="8" fill="#22c55e" opacity="0.8"/>
+    <text x="183" y="23" font-family="system-ui" font-size="12" fill="#c7d2fe" font-weight="600">USDC Nanopayments</text>
+
+    <!-- World ID badge -->
+    <rect x="360" y="0" width="130" height="36" rx="18" fill="white" opacity="0.08"/>
+    <rect x="360" y="0" width="130" height="36" rx="18" fill="none" stroke="white" stroke-width="0.5" opacity="0.15"/>
+    <circle cx="382" cy="18" r="8" fill="#fb7185" opacity="0.8"/>
+    <text x="398" y="23" font-family="system-ui" font-size="12" fill="#c7d2fe" font-weight="600">World ID</text>
+
+    <!-- Gasless badge -->
+    <rect x="505" y="0" width="110" height="36" rx="18" fill="white" opacity="0.08"/>
+    <rect x="505" y="0" width="110" height="36" rx="18" fill="none" stroke="white" stroke-width="0.5" opacity="0.15"/>
+    <circle cx="527" cy="18" r="8" fill="#fbbf24" opacity="0.8"/>
+    <text x="543" y="23" font-family="system-ui" font-size="12" fill="#c7d2fe" font-weight="600">Gas-Free</text>
+  </g>
+
+  <!-- Payment amount floating labels -->
+  <g font-family="system-ui, monospace" font-weight="700" opacity="0.25">
+    <text x="750" y="130" font-size="14" fill="#22c55e" transform="rotate(-5, 750, 130)">+$0.0001</text>
+    <text x="820" y="480" font-size="12" fill="#fbbf24" transform="rotate(3, 820, 480)">+1 HAT</text>
+    <text x="680" y="520" font-size="13" fill="#22c55e" transform="rotate(-2, 680, 520)">+$0.0003</text>
+    <text x="950" y="100" font-size="11" fill="#fbbf24" transform="rotate(4, 950, 100)">+3 HAT</text>
+    <text x="1050" y="520" font-size="14" fill="#22c55e" transform="rotate(-3, 1050, 520)">+$0.01</text>
+  </g>
+
+  <!-- Bottom accent line -->
+  <rect x="0" y="626" width="1200" height="4" fill="url(#accent2)"/>
+</svg>

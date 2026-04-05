@@ -673,17 +673,17 @@ function createSidebar(ads: Ad[]) {
 
   sidebar.innerHTML = `
     <div class="hat-header">
-      <div class="hat-header-brand">
-        <div class="hat-logo-icon">H</div>
-        <div class="hat-header-info">
-          <span class="hat-header-title">HAT</span>
-          <span class="hat-header-sub">Human Attention Token</span>
+      <div class="hat-header-top">
+        <div class="hat-header-brand">
+          <div class="hat-logo-icon">H</div>
+          <div class="hat-header-info">
+            <span class="hat-header-title">HAT</span>
+            <span class="hat-header-sub">Human Attention Token</span>
+          </div>
         </div>
-      </div>
-      <div class="hat-header-right">
-        <div class="hat-earnings-pill" id="hat-session-earnings">$0.00 USDC · 0 HAT</div>
         <button class="hat-toggle" title="Toggle sidebar">▶</button>
       </div>
+      <div class="hat-earnings-pill" id="hat-session-earnings">$0.00 USDC · 0 HAT</div>
     </div>
     <div class="hat-sidebar-body">
       <div class="hat-earnings">Earning USDC nanopayments + HAT bonus</div>

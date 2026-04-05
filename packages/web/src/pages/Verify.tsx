@@ -162,48 +162,54 @@ export function Verify() {
               </div>
             )}
 
-            {rpContext ? (
-              <IDKitRequestWidget
-                app_id={APP_ID}
-                action={WORLD_ID_ACTION}
-                rp_context={rpContext}
-                allow_legacy_proofs={true}
-                environment="production"
-                preset={orbLegacy({ signal: user.address || "hat-user" })}
-                open={widgetOpen}
-                onOpenChange={setWidgetOpen}
-                handleVerify={handleVerify}
-                onSuccess={handleSuccess}
-                onError={(code) => {
-                  console.warn("[IDKit] error:", code);
-                  // Don't show error for autoclose — fall back to manual button
-                  if (!isAutoClose) {
-                    setError(String(code));
-                    setStatus("error");
-                  }
-                  setWidgetOpen(false);
-                }}
-              />
-            ) : null}
+            {user.address ? (
+              <>
+                {rpContext ? (
+                  <IDKitRequestWidget
+                    app_id={APP_ID}
+                    action={WORLD_ID_ACTION}
+                    rp_context={rpContext}
+                    allow_legacy_proofs={true}
+                    environment="production"
+                    preset={orbLegacy({ signal: user.address })}
+                    open={widgetOpen}
+                    onOpenChange={setWidgetOpen}
+                    handleVerify={handleVerify}
+                    onSuccess={handleSuccess}
+                    onError={(code) => {
+                      console.warn("[IDKit] error:", code);
+                      if (!isAutoClose) {
+                        setError(String(code));
+                        setStatus("error");
+                      }
+                      setWidgetOpen(false);
+                    }}
+                  />
+                ) : null}
 
-            <button
-              onClick={() => {
-                if (rpContext) {
-                  setWidgetOpen(true);
-                } else {
-                  setError("RP context not available — backend may not be configured");
-                  setStatus("error");
-                }
-              }}
-              style={{ ...btnPrimary, width: "100%", padding: 16, fontSize: 16 }}
-            >
-              Verify with World ID
-            </button>
-
-            {!user.address && (
-              <button onClick={connect} style={{ ...btnSecondary, width: "100%", marginTop: 12, padding: 14, fontSize: 14 }}>
-                Or connect wallet first
-              </button>
+                <button
+                  onClick={() => {
+                    if (rpContext) {
+                      setWidgetOpen(true);
+                    } else {
+                      setError("RP context not available — backend may not be configured");
+                      setStatus("error");
+                    }
+                  }}
+                  style={{ ...btnPrimary, width: "100%", padding: 16, fontSize: 16 }}
+                >
+                  Verify with World ID
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={{ color: c.muted, fontSize: 13, marginBottom: 16 }}>
+                  Connect your wallet first — this is where your USDC earnings will be paid.
+                </p>
+                <button onClick={connect} style={{ ...btnPrimary, width: "100%", padding: 16, fontSize: 16 }}>
+                  Connect Wallet
+                </button>
+              </>
             )}
 
             <p style={{ fontSize: 12, color: c.muted, marginTop: 16, opacity: 0.7 }}>World ID 4.0 — Orb verification</p>
@@ -263,14 +269,3 @@ const btnPrimary: React.CSSProperties = {
   transition: "opacity .15s",
 };
 
-const btnSecondary: React.CSSProperties = {
-  padding: "12px 32px",
-  background: "transparent",
-  color: "#6366f1",
-  border: "1px solid #e0e7ff",
-  borderRadius: 12,
-  fontSize: 15,
-  fontWeight: 600,
-  cursor: "pointer",
-  transition: "background .15s",
-};

@@ -59,9 +59,12 @@ export async function runSettlement(d1: D1Database, env: Env, requireVerified = 
   // ── Step 1: USDC payments ──────────────────────────────────
   // Send nanopayments in parallel. Only mark sessions as settled
   // for users whose payment actually succeeded.
+  // Skip nullifier-based IDs (not valid wallet addresses)
+  const isValidAddress = (addr: string) => addr.startsWith("0x") && addr.length === 42;
+
   if (env.GATEWAY_PRIVATE_KEY) {
     const payments = [...perUser.entries()]
-      .filter(([, data]) => data.usdc > 0)
+      .filter(([addr, data]) => data.usdc > 0 && isValidAddress(addr))
       .map(async ([addr, data]) => {
         try {
           const result = await sendNanopayment(env, addr, data.usdc);

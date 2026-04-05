@@ -112,6 +112,17 @@
       color: rgba(255,255,255,0.7);
       flex: 1;
       font-family: 'SF Mono', 'Fira Code', monospace, system-ui;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .wallet-bar .wallet-addr:hover {
+      color: #fff;
+    }
+    .wallet-bar .wallet-addr .copy-hint {
+      font-size: 9px;
+      color: rgba(255,255,255,0.3);
+      font-family: system-ui;
+      margin-left: 4px;
     }
     .wallet-bar .disconnect-btn {
       background: rgba(251,113,133,0.12);
@@ -311,7 +322,7 @@
         </div>
         <p>Verify your humanity to start<br/>earning HAT & USDC</p>
         <button class="btn btn-primary" id="worldid-btn">Login with World ID</button>
-        <div style="display:flex;align-items:center;gap:10px;margin:12px 0 2px;">
+        <div id="connect-divider" style="display:flex;align-items:center;gap:10px;margin:12px 0 2px;">
           <div style="flex:1;height:1px;background:rgba(255,255,255,0.06);"></div>
           <span style="font-size:10px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:1px;">or</span>
           <div style="flex:1;height:1px;background:rgba(255,255,255,0.06);"></div>
