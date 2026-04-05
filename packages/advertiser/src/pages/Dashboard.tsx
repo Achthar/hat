@@ -175,8 +175,8 @@ export function Dashboard() {
     }
   }
 
-  async function fundGatewayWallet(amount: number) {
-    if (!window.ethereum || !address) { setDepositStatus("Connect wallet first"); return; }
+  async function fundGatewayWallet(amount: number): Promise<boolean> {
+    if (!window.ethereum || !address) { setDepositStatus("Connect wallet first"); return false; }
 
     // Fetch gateway status if not loaded yet
     let target = gatewayStatus?.gatewayWallet || gatewayStatus?.platformAddress;
@@ -189,9 +189,10 @@ export function Dashboard() {
       } catch {}
     }
     if (!target) {
+      // No gateway — send directly to platform EOA as fallback
       setDepositStatus("Gateway not configured — deposit simulated for demo");
       await recordDeposit(address, amount, null);
-      return;
+      return true;
     }
 
     try {
@@ -200,12 +201,19 @@ export function Dashboard() {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       setDepositStatus("Confirm the deposit transaction in your wallet...");
-      const tx = await signer.sendTransaction({ to: target, value: ethers.parseEther(String(amount)) });
+      const value = ethers.parseEther(String(amount));
+
+      // Send directly to platform EOA — Gateway contract deposit() not needed
+      // for advertiser funding (the platform manages Gateway deposits separately)
+      const platformAddr = gatewayStatus?.platformAddress || target;
+      const tx = await signer.sendTransaction({ to: platformAddr, value });
+
       setDepositStatus("Transaction submitted, waiting for confirmation...");
       const receipt = await tx.wait();
       await recordDeposit(address, amount, receipt?.hash ?? null);
       setDepositStatus("Deposit complete!");
       loadAll(address);
+      return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("user rejected") || msg.includes("denied")) {
@@ -213,6 +221,7 @@ export function Dashboard() {
       } else {
         setDepositStatus(`Deposit failed: ${msg}`);
       }
+      return false;
     }
   }
 
@@ -279,18 +288,23 @@ export function Dashboard() {
   async function createCampaign(e: React.FormEvent) {
     e.preventDefault();
     if (!address) return;
+
+    // Deposit first — only create the campaign if payment succeeds
+    const budget = Number(form.budgetUsdc);
+    const paid = await fundGatewayWallet(budget);
+    if (!paid) return;
+
     const res = await fetch(`${API_BASE}/ads/create`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         advertiserId: address, title: form.title, imageUrl: form.imageUrl,
-        targetUrl: form.targetUrl, budgetUsdc: Number(form.budgetUsdc),
+        targetUrl: form.targetUrl, budgetUsdc: budget,
         viewRewardPerSecond: form.viewRate ? Number(form.viewRate) : 0.0001,
         clickRewardUsdc: form.clickReward ? Number(form.clickReward) : 0,
       }),
     });
     const ad = await res.json();
-    await fundGatewayWallet(Number(form.budgetUsdc));
     setCampaigns((prev) => [...prev, {
       id: ad.id, title: ad.title, image_url: ad.imageUrl, target_url: ad.targetUrl,
       budget_allocated_usdc: ad.budgetAllocatedUsdc, budget_spent_usdc: 0,
